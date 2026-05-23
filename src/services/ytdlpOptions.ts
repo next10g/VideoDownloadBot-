@@ -5,6 +5,14 @@ import { getYtdlpJsRuntimesFlag, resolveNodeForYtdlp } from '@/services/ytdlpNod
 import type { YtDlpFlags } from '@/services/ytdlpTypes'
 
 const maxFilesize = `${env.MAX_FILE_SIZE_MB}M`
+/** Prefer progressive HTTPS MP4 (avoid m3u8/HLS on shared hosting). */
+const progressiveVideoFormat = [
+  `best[ext=mp4][vcodec!=none][acodec!=none][protocol^=http][filesize<=${maxFilesize}]`,
+  `best[ext=mp4][protocol^=http][filesize<=${maxFilesize}][height<=720]`,
+  `bestvideo[ext=mp4][height<=720][protocol^=http]+bestaudio[ext=m4a][protocol^=http]`,
+  `best[height<=720][filesize<=${maxFilesize}]`,
+  'best',
+].join('/')
 
 let cachedCookiesPath: string | undefined
 let cookiesResolved = false
@@ -41,7 +49,8 @@ export function buildDownloadFlags(outputBase: string, audio: boolean): YtDlpFla
     writeInfoJson: true,
     format: audio
       ? `bestaudio[filesize<=${maxFilesize}]/bestaudio[filesize_approx<=${maxFilesize}]/bestaudio`
-      : `best[ext=mp4][filesize<=${maxFilesize}]/best[filesize<=${maxFilesize}]/bestvideo*+bestaudio/best`,
+      : progressiveVideoFormat,
+    formatSort: 'res:720,ext:mp4:m4a,proto:https,codec:h264,size',
   }
 
   if (ffmpeg) {
@@ -61,8 +70,11 @@ export function buildDownloadFlags(outputBase: string, audio: boolean): YtDlpFla
 }
 
 function youtubeExtractorArgs(): string {
+  if (cachedCookiesPath && getYtdlpJsRuntimesFlag()) {
+    return 'youtube:player_client=tv,mweb,web'
+  }
   if (cachedCookiesPath) {
-    return 'youtube:player_client=web,mweb,android'
+    return 'youtube:player_client=tv,mweb,web,android'
   }
   return 'youtube:player_client=android,ios,tv,web;player_skip=webpage,configs'
 }

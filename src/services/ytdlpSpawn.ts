@@ -38,6 +38,17 @@ function spawnYtdlp(
 ): Promise<YtDlpMetadata | YtdlpDownloadResult> {
   const args = [...flagsToArgs(flags), url]
 
+  if (mode === 'download') {
+    logger.info('yt-dlp download', {
+      label,
+      url,
+      binary,
+      args: args.slice(0, -1).map((arg) =>
+        /^--cookies(=|$)/.test(arg) ? '--cookies=***' : arg
+      ),
+    })
+  }
+
   return new Promise((resolve, reject) => {
     const child = spawn(binary, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
