@@ -62,28 +62,34 @@ node --version
 
 ### تثبيت yt-dlp (SSH)
 
-Hostinger غالباً:
+على سيرفرك (مثل `fr-int-web1424`):
 
-- **Python 3.6** في النظام — لا يكفي لـ yt-dlp
-- **`yt-dlp_linux`** يفشل بـ `libz.so.1: failed to map segment` (قيود الاستضافة)
+| المحاولة | النتيجة |
+|----------|---------|
+| `python3` | 3.6 فقط — **لا يكفي** |
+| `yt-dlp_linux` | `libz.so.1` — **لا يعمل** |
+| `/opt/alt/alt-python311` | غير موجود |
 
-**الحل:** سكربت التثبيت يجرّب standalone ثم يبني **غلاف Python 3.10+** (alt-python):
+**الحل:** تثبيت **Python محمول** داخل المشروع (مجلد `.python/` ~50MB، مرة واحدة):
 
 ```bash
 cd ~/domains/t.nextegypt-agri.com/nodejs
 bash scripts/install-ytdlp.sh
 ```
 
-إذا لم يجد Python 3.10، جرّب يدوياً:
+قد يستغرق 2–5 دقائق (تحميل + pip). عند النجاح:
 
 ```bash
-/opt/alt/alt-python311/bin/python3.11 --version
-export YTDLP_PYTHON=/opt/alt/alt-python311/bin/python3.11
-bash scripts/install-ytdlp.sh
 bin/yt-dlp --version
+ls -la .python/bin/yt-dlp
 ```
 
-يجب أن يطبع رقم إصدار بدون Traceback وبدون خطأ `libz`.
+إذا وُجد Node في PATH:
+
+```bash
+export PATH=/opt/alt/alt-nodejs20/root/usr/bin:$PATH
+node scripts/ytdlp-install-lib.js
+```
 
 ### باقي الأوامر (بعد تفعيل Node في PATH)
 
