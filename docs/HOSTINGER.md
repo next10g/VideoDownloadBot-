@@ -170,7 +170,7 @@ UPLOAD_MAX_RETRIES=5
 SKIP_THUMBNAILS=true
 MAX_FILE_SIZE_MB=50
 ```
-
+بببب
 3. تأكد أن `bin/ffmpeg` موجود بعد كل نشر (أو شغّل `bash scripts/install-ffmpeg.sh`).
 4. اختبر من SSH:
 

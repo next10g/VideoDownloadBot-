@@ -65,6 +65,10 @@ const env = cleanEnv(process.env, {
     default: '',
     desc: 'Netscape cookies.txt for YouTube (or place file named "cookie" in project root)',
   }),
+  YTDLP_NODE_PATH: str({
+    default: '',
+    desc: 'Node binary for yt-dlp YouTube JS (defaults to process running the bot)',
+  }),
   SKIP_YTDLP_PROBE: bool({ default: false }),
   SOFT_YTDLP_PROBE: bool({
     default: true,
@@ -90,6 +94,10 @@ const envApi = {
   },
   get COOKIES_PATH_RESOLVED() {
     const custom = env.COOKIES_PATH.trim()
+    return custom || undefined
+  },
+  get YTDLP_NODE_PATH_RESOLVED() {
+    const custom = env.YTDLP_NODE_PATH.trim()
     return custom || undefined
   },
   get isDevelopment() {
