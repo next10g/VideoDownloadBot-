@@ -63,7 +63,11 @@ const env = cleanEnv(process.env, {
   FFMPEG_PATH: str({ default: '' }),
   YOUTUBE_USE_COOKIES: bool({
     default: false,
-    desc: 'Public bot: keep false. Optional admin cookies/pool as fallback only',
+    desc: 'Try admin cookies before anonymous clients (not for large public bots)',
+  }),
+  YOUTUBE_FALLBACK_COOKIES: bool({
+    default: true,
+    desc: 'After anonymous clients fail, try cookies.txt / cookies-pool (server-side only)',
   }),
   YOUTUBE_COOKIE_POOL_DIR: str({
     default: '',

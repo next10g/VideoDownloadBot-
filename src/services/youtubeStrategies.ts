@@ -50,7 +50,7 @@ export function youtubeStrategiesWithCookies(
       cookiesPath,
     },
     {
-      id: 'cookies_android',
+      id: 'cookies_android_vr',
       extractorArgs: `youtube:player_client=android_vr,android,ios${po}`,
       cookiesPath,
     },

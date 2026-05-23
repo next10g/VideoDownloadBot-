@@ -1,6 +1,6 @@
 import env from '@/helpers/env'
 import { getFfmpegPath } from '@/services/ffmpegPath'
-import { resolveCookiePool, shouldUseYoutubeCookies } from '@/services/ytdlpCookies'
+import { resolveCookiePool, shouldLoadYoutubeCookiePool } from '@/services/ytdlpCookies'
 import { getYtdlpJsRuntimesFlag, resolveNodeForYtdlp } from '@/services/ytdlpNodeRuntime'
 import type { YtDlpFlags } from '@/services/ytdlpTypes'
 
@@ -31,7 +31,7 @@ function defaultYoutubeExtractorArgs(): string {
 /** Call at startup — Node runtime + optional cookie pool for admin mode. */
 export async function initYtdlpOptions(): Promise<void> {
   await resolveNodeForYtdlp()
-  if (shouldUseYoutubeCookies()) {
+  if (shouldLoadYoutubeCookiePool()) {
     await resolveCookiePool()
   }
   cookiesPoolReady = true

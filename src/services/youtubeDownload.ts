@@ -1,6 +1,10 @@
 import logger from '@/lib/logger'
 import env from '@/helpers/env'
-import { pickCookieForJob, shouldUseYoutubeCookies } from '@/services/ytdlpCookies'
+import {
+  cookiePoolSize,
+  pickCookieForJob,
+  shouldUseYoutubeCookies,
+} from '@/services/ytdlpCookies'
 import { runYtdlpDownload } from '@/services/ytdlpRunner'
 import type { YtdlpDownloadResult } from '@/services/ytdlpSpawn'
 import {
@@ -12,12 +16,19 @@ import {
 } from '@/services/youtubeStrategies'
 
 function strategiesForJob(jobId: string): YoutubeStrategy[] {
-  const list = [...youtubeStrategiesNoCookies()]
-  if (shouldUseYoutubeCookies()) {
-    const cookiePath = pickCookieForJob(jobId)
-    if (cookiePath) {
-      list.push(...youtubeStrategiesWithCookies(cookiePath))
-    }
+  const anonymous = youtubeStrategiesNoCookies()
+  const cookiePath = pickCookieForJob(jobId)
+  const withCookies = cookiePath
+    ? youtubeStrategiesWithCookies(cookiePath)
+    : []
+
+  if (shouldUseYoutubeCookies() && withCookies.length > 0) {
+    return [...withCookies, ...anonymous]
+  }
+
+  const list = [...anonymous]
+  if (env.YOUTUBE_FALLBACK_COOKIES && withCookies.length > 0) {
+    list.push(...withCookies)
   }
   return list
 }
@@ -52,12 +63,17 @@ export async function runYoutubeDownload(
 }
 
 export function logYoutubePublicMode(): void {
+  const pool = cookiePoolSize()
+  const poToken = Boolean(env.YTDLP_YOUTUBE_PO_TOKEN.trim())
   if (shouldUseYoutubeCookies()) {
-    logger.info('YouTube mode: optional cookies/pool enabled (admin)')
+    logger.info('YouTube mode: cookies first', { pool, poToken })
     return
   }
-  logger.info('YouTube mode: public (no cookies)', {
-    poToken: Boolean(env.YTDLP_YOUTUBE_PO_TOKEN.trim()),
+  logger.info('YouTube mode: public', {
+    anonymousFirst: true,
+    fallbackCookies: env.YOUTUBE_FALLBACK_COOKIES && pool > 0,
+    cookiePoolSize: pool,
+    poToken,
     userCooldownSec: env.YOUTUBE_USER_COOLDOWN_SECONDS,
   })
 }

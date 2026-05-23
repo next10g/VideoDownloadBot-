@@ -6,7 +6,8 @@ A **public** bot cannot use each user's browser cookies. One shared `cookies.txt
 
 | Setting | Default | Meaning |
 |--------|---------|---------|
-| `YOUTUBE_USE_COOKIES` | `false` | No cookies for normal downloads |
+| `YOUTUBE_USE_COOKIES` | `false` | Do not try cookies first |
+| `YOUTUBE_FALLBACK_COOKIES` | `true` | After anonymous fails, use `cookies.txt` (server admin only) |
 | `YOUTUBE_USER_COOLDOWN_SECONDS` | `20` | Per-user gap between YouTube links |
 | `YTDLP_NODE_PATH` | auto | Required for YouTube JS on Hostinger |
 

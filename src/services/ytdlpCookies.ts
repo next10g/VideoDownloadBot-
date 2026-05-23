@@ -12,6 +12,10 @@ export function shouldUseYoutubeCookies(): boolean {
   return env.YOUTUBE_USE_COOKIES
 }
 
+export function shouldLoadYoutubeCookiePool(): boolean {
+  return shouldUseYoutubeCookies() || env.YOUTUBE_FALLBACK_COOKIES
+}
+
 export function isYoutubeBotBlock(message: string): boolean {
   const m = message.toLowerCase()
   return (
@@ -124,9 +128,9 @@ async function listCookiePoolDir(dirPath: string): Promise<string[]> {
   }
 }
 
-/** Load optional admin cookie pool (only when YOUTUBE_USE_COOKIES=true). */
+/** Load admin cookie file(s) when cookies-first or fallback mode is enabled. */
 export async function resolveCookiePool(): Promise<string[]> {
-  if (!shouldUseYoutubeCookies()) {
+  if (!shouldLoadYoutubeCookiePool()) {
     return []
   }
   if (poolResolved) {
@@ -157,6 +161,10 @@ export function pickCookieForJob(jobId: string): string | undefined {
   }
   const idx = parseInt(jobId.slice(-8), 16) % pool.length
   return pool[idx]
+}
+
+export function cookiePoolSize(): number {
+  return cookiePool?.length ?? 0
 }
 
 export async function resolveCookiesPath(): Promise<string | undefined> {
