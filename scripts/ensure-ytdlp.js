@@ -15,10 +15,11 @@ const PROJECT_BIN = path.join(__dirname, '..', 'bin', 'yt-dlp')
 
 function candidatePaths() {
   const fromEnv = process.env.YTDLP_PATH
+  // Project bin first — /tmp is often noexec on shared hosting
   const list = [
-    fromEnv,
     PROJECT_BIN,
     path.join(process.cwd(), 'bin', 'yt-dlp'),
+    fromEnv,
     path.join(os.tmpdir(), 'yt-dlp'),
     '/tmp/yt-dlp',
   ].filter(Boolean)

@@ -64,8 +64,8 @@ node dist/app.js
 MAX_FILE_SIZE_MB=200
 SKIP_THUMBNAILS=true
 NODE_OPTIONS=--max-old-space-size=384
-# اختياري — الافتراضي bin/yt-dlp داخل المشروع (أفضل من /tmp على shared hosting)
-# YTDLP_PATH=/home/.../bin/yt-dlp
+# لا تضبط YTDLP_PATH=/tmp/yt-dlp — /tmp غالباً noexec ويسبب EACCES
+# اتركه فارغاً أو استخدم المسار الكامل لـ bin/yt-dlp داخل التطبيق
 ```
 
 ## خطأ `EACCES` أثناء `postinstall` / `ensure-ytdlp`
@@ -84,7 +84,8 @@ chmod +x bin/yt-dlp
 bin/yt-dlp --version
 ```
 
-إذا لزم: `YTDLP_PATH=/full/path/to/your/app/bin/yt-dlp` في متغيرات Hostinger.
+في hPanel **احذف** `YTDLP_PATH=/tmp/yt-dlp` إن وُجد. اترك المتغير فارغاً أو ضعه على:
+`/home/u987639727/domains/t.nextegypt-agri.com/nodejs/bin/yt-dlp` (عدّل المسار حسب مجلدك).
 
 ## خطأ `yt-dlp probe failed` مع `message` فارغ
 

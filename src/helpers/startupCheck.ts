@@ -1,13 +1,12 @@
-import { access, mkdir, writeFile, rm } from 'fs/promises'
+import { mkdir, writeFile, rm } from 'fs/promises'
 import { join } from 'path'
-import { constants as fsConstants } from 'fs'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import mongoose from 'mongoose'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
 import { TEMP_ROOT } from '@/helpers/tempDir'
-import { initYtdlpBinary } from '@/services/ytdlpBinary'
+import { initYtdlpBinary, isYtdlpRunnable } from '@/services/ytdlpBinary'
 import { runYtdlpJson } from '@/services/ytdlpRunner'
 import { formatYtdlpError } from '@/services/ytdlpSpawn'
 import { buildProbeFlags } from '@/services/ytdlpOptions'
@@ -33,13 +32,7 @@ async function commandExists(
 }
 
 async function checkYtdlpBinary(binaryPath: string): Promise<boolean> {
-  try {
-    await access(binaryPath, fsConstants.F_OK)
-    await execFileAsync(binaryPath, ['--version'], { timeout: 15_000 })
-    return true
-  } catch {
-    return false
-  }
+  return isYtdlpRunnable(binaryPath)
 }
 
 export async function runStartupChecks(): Promise<StartupCheckResult> {

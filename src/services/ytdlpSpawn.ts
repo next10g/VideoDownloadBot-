@@ -1,7 +1,11 @@
 import { spawn } from 'child_process'
 import { killProcessTree } from '@/lib/killProcessTree'
 import logger from '@/lib/logger'
-import { initYtdlpBinary } from '@/services/ytdlpBinary'
+import {
+  clearYtdlpPathCache,
+  initYtdlpBinary,
+  resolveYtdlpPath,
+} from '@/services/ytdlpBinary'
 import type { YtDlpFlags, YtDlpMetadata } from '@/services/ytdlpTypes'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -24,13 +28,13 @@ export function killAllYtdlpProcesses(): void {
   activeChildren.clear()
 }
 
-export async function runYtdlpJson(
+function spawnYtdlpJson(
+  binary: string,
   url: string,
   flags: YtDlpFlags,
   timeoutMs: number,
   label: string
 ): Promise<YtDlpMetadata> {
-  const binary = await initYtdlpBinary()
   const args = [...flagsToArgs(flags), url]
 
   return new Promise((resolve, reject) => {
@@ -89,6 +93,32 @@ export async function runYtdlpJson(
       reject(new Error(detail))
     })
   })
+}
+
+export async function runYtdlpJson(
+  url: string,
+  flags: YtDlpFlags,
+  timeoutMs: number,
+  label: string
+): Promise<YtDlpMetadata> {
+  let binary = await initYtdlpBinary()
+  try {
+    return await spawnYtdlpJson(binary, url, flags, timeoutMs, label)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    const permissionDenied =
+      message.includes('EACCES') || message.includes('exit code -13')
+    if (!permissionDenied) {
+      throw error
+    }
+    logger.warn('yt-dlp EACCES — clearing cache and re-resolving binary', {
+      path: binary,
+    })
+    clearYtdlpPathCache()
+    binary = await resolveYtdlpPath()
+    logger.info('yt-dlp binary (retry)', { path: binary })
+    return spawnYtdlpJson(binary, url, flags, timeoutMs, label)
+  }
 }
 
 export function formatYtdlpError(error: unknown): string {
