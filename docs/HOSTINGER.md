@@ -15,7 +15,7 @@ Hostinger يشغّل `yarn install --non-interactive` وهذا **ملغى في Y
 | **Node.js version** | **20** |
 | **Package manager** | **npm** (مهم — ليس Yarn) |
 | **Install command** | `node scripts/hostinger-install.js` |
-| **Build command** | `npm run build-ts` |
+| **Build command** | `node scripts/hostinger-build.js` (أو اتركه فارغاً — التثبيت يبني تلقائياً) |
 | **Start command** | `node dist/app.js` |
 
 ### متغيرات البيئة
@@ -99,10 +99,20 @@ node scripts/ytdlp-install-lib.js
 cd ~/domains/t.nextegypt-agri.com/nodejs
 source scripts/hostinger-env.sh
 
-# أو مباشرة:
+# أو مباشرة (سطر واحد لكل أمر — لا تلصق أوامر معاً):
 /opt/alt/alt-nodejs20/root/usr/bin/node scripts/hostinger-install.js
-/opt/alt/alt-nodejs20/root/usr/bin/npm run build-ts
+/opt/alt/alt-nodejs20/root/usr/bin/node scripts/hostinger-build.js
 ```
+
+### `tsc: Permission denied`
+
+Hostinger أحياناً يمنع تنفيذ `node_modules/.bin/tsc`. لا تستخدم `npm run build-ts` — استخدم:
+
+```bash
+/opt/alt/alt-nodejs20/root/usr/bin/node scripts/hostinger-build.js
+```
+
+أو ابنِ على جهازك (`npm run build-ts`) وارفع مجلد `dist/` فقط.
 
 أمر التثبيت في **hPanel** (بدون SSH):
 

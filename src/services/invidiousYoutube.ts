@@ -33,12 +33,13 @@ interface InvidiousVideo {
 }
 
 const DEFAULT_INVIDIOUS_APIS = [
+  'https://invidious.fdn.fr',
+  'https://yewtu.be',
+  'https://invidious.protokolla.fi',
+  'https://iv.ggtyler.dev',
   'https://inv.tux.pizza',
   'https://invidious.private.coffee',
   'https://inv.nadeko.net',
-  'https://yt.artemislena.eu',
-  'https://invidious.privacyredirect.com',
-  'https://invidious.nerdvpn.de',
 ]
 
 function invidiousApiBases(): string[] {

@@ -9,6 +9,7 @@
 
 const { spawnSync } = require('child_process')
 const fs = require('fs')
+const path = require('path')
 
 /** Hostinger breaks when NODE_OPTIONS contains dns-result-order (invalid or uppercased). */
 function buildEnv(extraPath) {
@@ -36,8 +37,8 @@ function findHostingerTool(name) {
     return fromEnv
   }
   const dirs = [
-    '/opt/alt/alt-nodejs22/root/usr/bin',
     '/opt/alt/alt-nodejs20/root/usr/bin',
+    '/opt/alt/alt-nodejs22/root/usr/bin',
     '/opt/alt/alt-nodejs18/root/usr/bin',
   ]
   for (const dir of dirs) {
@@ -76,6 +77,16 @@ if (!run(npmBin, ['install'])) {
 
 if (!run(nodeBin, ['scripts/ensure-ytdlp.js'])) {
   process.exit(1)
+}
+
+const buildScript = path.join(__dirname, 'hostinger-build.js')
+if (fs.existsSync(buildScript)) {
+  if (!run(nodeBin, [buildScript])) {
+    console.warn('TypeScript build failed — upload dist/ from your PC or run:')
+    console.warn(`  ${nodeBin} scripts/hostinger-build.js`)
+  }
+} else {
+  console.warn('hostinger-build.js missing — run build-ts locally and upload dist/')
 }
 
 console.log('Install completed (npm).')

@@ -2,21 +2,21 @@
 
 Public bots **cannot** rely on one person’s `cookies.txt` — Google rotates them and datacenter IPs (Hostinger) get blocked.
 
-## Solution in this project: **Piped API** (default)
+## Solution in this project: **Invidious / Piped** (default)
 
 | Setting | Value |
 |--------|--------|
-| `YOUTUBE_BACKEND` | `auto` (default): Piped → Invidious → yt-dlp |
+| `YOUTUBE_BACKEND` | `auto` (default): Invidious → Piped → yt-dlp |
 
 How it works:
 
 1. User sends a YouTube link.
-2. Bot asks a **Piped** public API for stream URLs (no login, no cookies).
+2. Bot asks **Invidious** (then **Piped**) public APIs for stream URLs (no login, no cookies).
 3. Bot downloads the file and sends it on Telegram.
 
 Users do **nothing** extra. You do **not** upload cookies every day.
 
-Fallback: `YOUTUBE_BACKEND=auto` tries Piped first, then yt-dlp if Piped is down.
+Fallback: `YOUTUBE_BACKEND=auto` tries Invidious, then Piped, then yt-dlp if both are down.
 
 ---
 
@@ -32,7 +32,7 @@ YOUTUBE_USE_COOKIES=false
 YOUTUBE_FALLBACK_COOKIES=false
 ```
 
-If Piped returns 502 on your host, Invidious is tried automatically. Logs:
+If Invidious fails on your host, Piped is tried next. Logs:
 
 ```json
 {"msg":"youtube invidious download"}

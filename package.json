@@ -15,6 +15,7 @@
     "build": "npm run build-ts",
     "build-ts": "tsc --skipLibCheck",
     "hostinger:install": "node scripts/hostinger-install.js",
+    "hostinger:build": "node scripts/hostinger-build.js",
     "postinstall": "node scripts/ensure-ytdlp.js",
     "rebuild-sharp": "npm rebuild sharp",
     "pretty": "prettier --check src",

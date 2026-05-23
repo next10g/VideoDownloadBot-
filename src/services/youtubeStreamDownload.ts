@@ -4,6 +4,26 @@ import { pipeline } from 'stream/promises'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
 
+/** Node fetch uses undici; default connect timeout is 10s (too short on shared hosting). */
+function fetchDispatcher(timeoutMs: number): unknown | undefined {
+  try {
+    const { Agent } = require('undici') as {
+      Agent: new (opts: {
+        connectTimeout: number
+        headersTimeout: number
+        bodyTimeout: number
+      }) => unknown
+    }
+    return new Agent({
+      connectTimeout: timeoutMs,
+      headersTimeout: timeoutMs,
+      bodyTimeout: timeoutMs,
+    })
+  } catch {
+    return undefined
+  }
+}
+
 export function fetchErrorDetail(error: unknown): string {
   if (!(error instanceof Error)) {
     return String(error)
@@ -23,14 +43,16 @@ export async function fetchJson<T>(
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
+    const dispatcher = fetchDispatcher(timeoutMs)
     const response = await fetch(url, {
       signal: controller.signal,
+      ...(dispatcher ? { dispatcher } : {}),
       headers: {
         Accept: 'application/json',
         'User-Agent': 'Mozilla/5.0 (compatible; VideoDownloadBot/1.0)',
       },
       redirect: 'follow',
-    })
+    } as RequestInit)
     if (!response.ok) {
       throw new Error(`${label} HTTP ${response.status}`)
     }
@@ -61,14 +83,16 @@ export async function downloadStreamToFile(
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
+    const dispatcher = fetchDispatcher(timeoutMs)
     const response = await fetch(streamUrl, {
       signal: controller.signal,
+      ...(dispatcher ? { dispatcher } : {}),
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; VideoDownloadBot/1.0)',
         Referer: 'https://www.youtube.com/',
       },
       redirect: 'follow',
-    })
+    } as RequestInit)
     if (!response.ok) {
       throw new Error(`Stream download HTTP ${response.status}`)
     }

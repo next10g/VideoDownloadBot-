@@ -39,8 +39,6 @@ const DEFAULT_PIPED_APIS = [
   'https://pipedapi.moomoo.me',
   'https://api-piped.mha.fi',
   'https://piped-api.lunar.icu',
-  'https://ytapi.dc09.ru',
-  'https://yapi.vyper.me',
   'https://pipedapi.kavin.rocks',
 ]
 
