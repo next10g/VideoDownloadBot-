@@ -1,41 +1,74 @@
-# Hostinger shared hosting guide
+# Hostinger deployment (fix npm install / Python error)
 
-## Endpoints
+Hostinger **does not have Python** on the build PATH. `youtube-dl-exec` fails with:
 
-| Path | Method | Purpose |
-|------|--------|---------|
-| `/health` | GET | Liveness (`ok`) |
-| `/diagnostics` | GET | JSON queue/memory/temp stats |
-| `/webhook/<WEBHOOK_SECRET>` | POST | Telegram updates |
+`youtube-dl-exec needs Python`
 
-## Recommended production `.env` (starter)
+## Solution — change the install command
 
-```env
-MAX_FILE_SIZE_MB=350
-MAX_DURATION_SECONDS=3600
-MAX_USER_ACTIVE_JOBS=1
-USER_COOLDOWN_SECONDS=45
-DOWNLOAD_TIMEOUT_MS=600000
-UPLOAD_TIMEOUT_MS=600000
-YTDLP_PROBE_TIMEOUT_MS=60000
-QUEUE_JOB_TIMEOUT_MS=900000
-QUEUE_MAX_RETRIES=1
-LOW_MEMORY_MODE=auto
-LOW_MEMORY_THRESHOLD_MB=150
-SKIP_THUMBNAILS=false
-```
+In **hPanel → Websites → your site → Node.js** (or Git deploy settings), set:
 
-## Node.js process (512MB plan example)
+### Install command
 
 ```bash
-NODE_OPTIONS="--max-old-space-size=384" node dist/app.js
+node scripts/hostinger-install.js
 ```
 
-## Monitoring
+**Or:**
 
-Poll `GET /diagnostics` every 1–5 minutes. Alert if:
+```bash
+YOUTUBE_DL_SKIP_PYTHON_CHECK=1 npm install
+```
 
-- `queue.pending` > 20 for extended periods
-- `temp.dirCount` growing without bound
-- `memory.rss` near hosting limit
-- `ytdlpActive` > 1 (should never happen)
+### Build command
+
+```bash
+npm run build-ts
+```
+
+### Start command
+
+```bash
+node dist/app.js
+```
+
+### Environment variables (hPanel)
+
+Add in the Node.js app settings (not only `.env` file):
+
+| Variable | Value |
+|----------|--------|
+| `YOUTUBE_DL_SKIP_PYTHON_CHECK` | `1` |
+| `TOKEN` | from @BotFather |
+| `MONGO` | MongoDB Atlas URI (real password, not `<db_password>`) |
+| `ADMIN_ID` | **numeric** user id from @userinfobot |
+| `WEBHOOK_URL` | `https://t.nextegypt-agri.com` |
+| `WEBHOOK_SECRET` | your secret |
+| `PORT` | `3000` (or port Hostinger assigns) |
+
+## After first successful install
+
+`scripts/ensure-ytdlp.js` downloads `yt-dlp` into `node_modules/youtube-dl-exec/bin/`.
+
+Verify on server (SSH if available):
+
+```bash
+node node_modules/youtube-dl-exec/bin/yt-dlp --version
+curl https://t.nextegypt-agri.com/health
+```
+
+## npm warnings (safe to ignore)
+
+- `EBADENGINE null-prototype-object` — needs Node 20+ for that sub-dependency; Node 18 still works.
+- `deprecated inflight/rimraf` — dev tooling only.
+
+## Recommended `.env` on Hostinger
+
+```env
+MAX_FILE_SIZE_MB=200
+MAX_DURATION_SECONDS=3600
+SKIP_THUMBNAILS=true
+NODE_OPTIONS=--max-old-space-size=384
+```
+
+`SKIP_THUMBNAILS=true` avoids `sharp` native binary issues on some shared hosts.
