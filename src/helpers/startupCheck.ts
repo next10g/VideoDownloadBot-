@@ -85,19 +85,13 @@ export async function runStartupChecks(): Promise<StartupCheckResult> {
     )
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const youtubedl = require('youtube-dl-exec')
-  const ytdlpPath = youtubedl.constants?.YOUTUBE_DL_PATH as string | undefined
-  const ytdlpOk = ytdlpPath
-    ? await checkYtdlpBinary(ytdlpPath)
-    : await commandExists('yt-dlp', ['--version'])
+  const ytdlpPath = '/tmp/yt-dlp'
+  const ytdlpOk = await checkYtdlpBinary(ytdlpPath)
   if (ytdlpOk) {
-    logger.info('startup: yt-dlp ok', { path: ytdlpPath || 'PATH' })
+    logger.info('startup: yt-dlp ok', { path: ytdlpPath })
   } else {
     errors.push(
-      ytdlpPath
-        ? `yt-dlp failed at ${ytdlpPath} — run: npm rebuild youtube-dl-exec`
-        : 'yt-dlp not found — run: npm install'
+      `yt-dlp failed at ${ytdlpPath} — check if ensure-ytdlp.js ran correctly`
     )
   }
 

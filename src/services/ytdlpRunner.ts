@@ -4,7 +4,8 @@ import logger from '@/lib/logger'
 import type { YtDlpFlags, YtDlpMetadata } from '@/services/ytdlpTypes'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const youtubedl = require('youtube-dl-exec')
+const ytdl = require('youtube-dl-exec')
+const youtubedl = ytdl.create('/tmp/yt-dlp')
 
 type YtdlpSubprocess = Promise<YtDlpMetadata> & ChildProcess
 
