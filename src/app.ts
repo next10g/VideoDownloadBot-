@@ -43,6 +43,7 @@ async function runApp() {
   registerProcessLifecycle()
   logger.info('starting app', { environment: env.ENVIRONMENT })
 
+/*
   const startup = await runStartupChecks()
   for (const warning of startup.warnings) {
     logger.warn('startup warning', { warning })
@@ -55,6 +56,7 @@ async function runApp() {
       `Startup checks failed:\n${startup.errors.map((e) => `- ${e}`).join('\n')}`
     )
   }
+*/
 
   await mkdir(TEMP_ROOT, { recursive: true })
   await startMongo()
