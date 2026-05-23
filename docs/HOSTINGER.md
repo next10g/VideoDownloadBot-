@@ -153,6 +153,29 @@ bin/ffmpeg -version
 
 ثم أعد نشر التطبيق — سيُكتشف `bin/ffmpeg` تلقائياً.
 
+## خطأ `Network request for 'sendDocument' failed`
+
+التحميل نجح لكن الرفع إلى Telegram فشل (شبكة بطيئة على الاستضافة).
+
+1. أعد النشر بعد آخر تحديث (إعادة محاولة تلقائية + مهلة أطول).
+2. في `.env` على Hostinger:
+
+```env
+UPLOAD_TIMEOUT_MS=900000
+UPLOAD_MAX_RETRIES=5
+SKIP_THUMBNAILS=true
+MAX_FILE_SIZE_MB=50
+```
+
+3. تأكد أن `bin/ffmpeg` موجود بعد كل نشر (أو شغّل `bash scripts/install-ffmpeg.sh`).
+4. اختبر من SSH:
+
+```bash
+curl -I https://api.telegram.org
+```
+
+إذا فشل الاتصال من السيرفر، Hostinger يحجب الخارج — تواصل مع الدعم أو استخدم **Bot API محلي** (`BOT_API_URL`).
+
 ## SIGTERM في السجلات
 
 طبيعي عند إعادة نشر Hostinger — البوت يعيد التشغيل. انتظر `bot ready` ثم اختبر الرابط.

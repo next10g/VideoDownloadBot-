@@ -28,14 +28,33 @@ function getRetryAfterMs(error: unknown): number | undefined {
   return undefined
 }
 
+function isNetworkError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+  const msg = error.message.toLowerCase()
+  const causeMsg =
+    typeof (error as Error & { cause?: unknown }).cause === 'object' &&
+    (error as Error & { cause?: Error }).cause instanceof Error
+      ? (error as Error & { cause: Error }).cause.message.toLowerCase()
+      : ''
+  const combined = `${msg} ${causeMsg}`
+  return (
+    combined.includes('network request') ||
+    combined.includes('fetch failed') ||
+    combined.includes('econnreset') ||
+    combined.includes('etimedout') ||
+    combined.includes('enotfound') ||
+    combined.includes('socket hang up') ||
+    combined.includes('timed out')
+  )
+}
+
 function isRetryable(error: unknown): boolean {
   if (error instanceof GrammyError) {
     return error.error_code === 429 || error.error_code >= 500
   }
-  if (error instanceof Error && error.message.includes('timed out')) {
-    return true
-  }
-  return false
+  return isNetworkError(error)
 }
 
 function buildInputFile(file: string | InputFile): InputFile | string {
@@ -112,9 +131,13 @@ export default async function sendCompletedFile(
 
   for (let attempt = 0; attempt <= env.UPLOAD_MAX_RETRIES; attempt++) {
     const uploadFile = buildInputFile(file)
+    const config =
+      attempt > 0
+        ? { ...sendDocumentConfig, thumb: undefined as undefined }
+        : sendDocumentConfig
     try {
       const sentMessage = await withTimeout(
-        sendOnce(botToSend, chatId, audio, uploadFile, sendDocumentConfig),
+        sendOnce(botToSend, chatId, audio, uploadFile, config),
         env.UPLOAD_TIMEOUT_MS,
         'Telegram upload'
       )
