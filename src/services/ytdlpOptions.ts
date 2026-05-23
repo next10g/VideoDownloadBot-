@@ -21,6 +21,7 @@ export function buildDownloadFlags(outputBase: string, audio: boolean): YtDlpFla
 
   const flags: YtDlpFlags = {
     ...baseFlags(),
+    quiet: true,
     output: `${outputBase}.%(ext)s`,
     writeInfoJson: true,
     format: audio

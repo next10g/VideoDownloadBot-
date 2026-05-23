@@ -28,13 +28,14 @@ export function killAllYtdlpProcesses(): void {
   activeChildren.clear()
 }
 
-function spawnYtdlpJson(
+function spawnYtdlp(
   binary: string,
   url: string,
   flags: YtDlpFlags,
   timeoutMs: number,
-  label: string
-): Promise<YtDlpMetadata> {
+  label: string,
+  expectJson: boolean
+): Promise<YtDlpMetadata | void> {
   const args = [...flagsToArgs(flags), url]
 
   return new Promise((resolve, reject) => {
@@ -69,6 +70,10 @@ function spawnYtdlpJson(
       clearTimeout(timer)
       activeChildren.delete(child)
       if (code === 0) {
+        if (!expectJson) {
+          resolve()
+          return
+        }
         const trimmed = stdout.trim()
         if (!trimmed) {
           reject(new Error('yt-dlp returned empty output'))
@@ -95,15 +100,32 @@ function spawnYtdlpJson(
   })
 }
 
-export async function runYtdlpJson(
+function spawnYtdlpJson(
+  binary: string,
   url: string,
   flags: YtDlpFlags,
   timeoutMs: number,
   label: string
 ): Promise<YtDlpMetadata> {
+  return spawnYtdlp(binary, url, flags, timeoutMs, label, true) as Promise<YtDlpMetadata>
+}
+
+function spawnYtdlpDownload(
+  binary: string,
+  url: string,
+  flags: YtDlpFlags,
+  timeoutMs: number,
+  label: string
+): Promise<void> {
+  return spawnYtdlp(binary, url, flags, timeoutMs, label, false) as Promise<void>
+}
+
+async function withYtdlpRetry<T>(
+  run: (binary: string) => Promise<T>
+): Promise<T> {
   let binary = await initYtdlpBinary()
   try {
-    return await spawnYtdlpJson(binary, url, flags, timeoutMs, label)
+    return await run(binary)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     const permissionDenied =
@@ -117,8 +139,31 @@ export async function runYtdlpJson(
     clearYtdlpPathCache()
     binary = await resolveYtdlpPath()
     logger.info('yt-dlp binary (retry)', { path: binary })
-    return spawnYtdlpJson(binary, url, flags, timeoutMs, label)
+    return run(binary)
   }
+}
+
+export async function runYtdlpJson(
+  url: string,
+  flags: YtDlpFlags,
+  timeoutMs: number,
+  label: string
+): Promise<YtDlpMetadata> {
+  return withYtdlpRetry((binary) =>
+    spawnYtdlpJson(binary, url, flags, timeoutMs, label)
+  )
+}
+
+/** Runs yt-dlp download; metadata comes from .info.json on disk, not stdout. */
+export async function runYtdlpDownload(
+  url: string,
+  flags: YtDlpFlags,
+  timeoutMs: number,
+  label: string
+): Promise<void> {
+  return withYtdlpRetry((binary) =>
+    spawnYtdlpDownload(binary, url, flags, timeoutMs, label)
+  )
 }
 
 export function formatYtdlpError(error: unknown): string {

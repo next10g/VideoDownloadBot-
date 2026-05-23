@@ -1,4 +1,4 @@
-import { readFile, stat } from 'fs/promises'
+import { readFile, readdir, stat } from 'fs/promises'
 import { join } from 'path'
 import { DocumentType } from '@typegoose/typegoose'
 import { InputFile } from 'grammy'
@@ -17,7 +17,7 @@ import { createJobTempDir, removePathSafe } from '@/helpers/tempDir'
 import withTimeout from '@/helpers/withTimeout'
 import logger from '@/lib/logger'
 import { buildDownloadFlags } from '@/services/ytdlpOptions'
-import { runYtdlpJson } from '@/services/ytdlpRunner'
+import { runYtdlpDownload } from '@/services/ytdlpRunner'
 import type { YtDlpMetadata } from '@/services/ytdlpTypes'
 import { validateMetadata } from '@/services/ytdlpProbe'
 
@@ -37,17 +37,40 @@ async function readInfoJson(
   }
 }
 
-function resolveDownloadedPath(
+async function findMediaFile(
+  jobDir: string,
+  fileBase: string
+): Promise<string | undefined> {
+  const entries = await readdir(jobDir)
+  const media = entries.filter(
+    (name) =>
+      name.startsWith(`${fileBase}.`) &&
+      !name.endsWith('.info.json') &&
+      !name.endsWith('.jpg') &&
+      !name.endsWith('.webp') &&
+      !name.endsWith('.png')
+  )
+  if (media.length === 1) {
+    return join(jobDir, media[0])
+  }
+  return undefined
+}
+
+async function resolveDownloadedPath(
   info: YtDlpMetadata,
   jobDir: string,
   fileBase: string
-): string {
+): Promise<string> {
   if (info._filename) {
     return info._filename
   }
   const ext = info.ext || info.entries?.[0]?.ext
   if (ext) {
     return join(jobDir, `${fileBase}.${ext}`)
+  }
+  const found = await findMediaFile(jobDir, fileBase)
+  if (found) {
+    return found
   }
   throw new Error('Could not resolve downloaded file path')
 }
@@ -73,20 +96,27 @@ export default async function downloadUrl(
     const options = buildDownloadFlags(outputBase, downloadJob.audio)
 
     logger.info('download start', { url: downloadJob.url, jobId: downloadJob.id })
-    await runYtdlpJson(
+    await runYtdlpDownload(
       downloadJob.url,
       options,
       env.DOWNLOAD_TIMEOUT_MS,
       'download'
     )
 
-    const info =
-      (await readInfoJson(jobDir, fileBase)) || ({} as YtDlpMetadata)
-    validateMetadata(info, downloadJob.url)
-
-    const filePath = resolveDownloadedPath(info, jobDir, fileBase)
+    const info = await readInfoJson(jobDir, fileBase)
+    let filePath: string
+    if (info) {
+      validateMetadata(info, downloadJob.url)
+      filePath = await resolveDownloadedPath(info, jobDir, fileBase)
+    } else {
+      const found = await findMediaFile(jobDir, fileBase)
+      if (!found) {
+        throw new Error('Download finished but no media or .info.json found')
+      }
+      filePath = found
+    }
     const fileSize = await assertFileWithinLimits(filePath)
-    const escapedTitle = escapeTitle(info.title)
+    const escapedTitle = escapeTitle(info?.title)
 
     downloadJob.status = DownloadJobStatus.uploading
     await downloadJob.save()
@@ -97,7 +127,9 @@ export default async function downloadUrl(
     const thumbPath =
       downloadJob.audio || !shouldProcessThumbnail(fileSize)
         ? undefined
-        : await getThumbnailUrl(info, jobDir, fileBase, fileSize)
+        : info
+          ? await getThumbnailUrl(info, jobDir, fileBase, fileSize)
+          : undefined
 
     const fileId = await withTimeout(
       sendCompletedFile(
