@@ -2,7 +2,7 @@ import env from '@/helpers/env'
 import { ValidationError } from '@/lib/errors'
 import logger from '@/lib/logger'
 import { buildProbeFlags } from '@/services/ytdlpOptions'
-import { runYtdlpJson } from '@/services/ytdlpRunner'
+import { formatYtdlpError, runYtdlpJson } from '@/services/ytdlpRunner'
 import type { YtDlpMetadata } from '@/services/ytdlpTypes'
 
 function normalizeMetadata(raw: YtDlpMetadata): YtDlpMetadata {
@@ -79,16 +79,28 @@ export async function probeUrlMetadata(url: string): Promise<YtDlpMetadata> {
     if (error instanceof ValidationError) {
       throw error
     }
-    const message = error instanceof Error ? error.message : String(error)
+    const message = formatYtdlpError(error)
     if (message.includes('Unsupported URL')) {
       throw new ValidationError(message, 'unsupported')
     }
     if (message.includes('No video formats')) {
       throw new ValidationError(message, 'unsupported')
     }
+    if (
+      message.includes('Sign in') ||
+      message.includes('bot') ||
+      message.includes('403')
+    ) {
+      throw new ValidationError(
+        'YouTube blocked this server. Try again later or use a cookie file.',
+        'unsupported'
+      )
+    }
     logger.warn('yt-dlp probe failed', { url, message })
     throw new ValidationError(
-      'Could not inspect this link safely',
+      message.length > 20
+        ? `Could not inspect link: ${message.slice(0, 200)}`
+        : 'Could not inspect this link (yt-dlp failed on server)',
       'probe_failed'
     )
   }

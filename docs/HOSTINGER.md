@@ -64,4 +64,16 @@ node dist/app.js
 MAX_FILE_SIZE_MB=200
 SKIP_THUMBNAILS=true
 NODE_OPTIONS=--max-old-space-size=384
+YTDLP_PATH=/tmp/yt-dlp
 ```
+
+## خطأ `yt-dlp probe failed` مع `message` فارغ
+
+1. تأكد أن `node scripts/ensure-ytdlp.js` نجح عند التثبيت.
+2. على SSH جرّب: `/tmp/yt-dlp --version`
+3. إذا فشل YouTube من السيرفر (حظر Hostinger للخارج)، ستظهر رسالة أوضح في السجلات بعد التحديث.
+4. مؤقتاً للاختبار: `SKIP_YTDLP_PROBE=true` في `.env` (يتخطى الفحص ويحاول التحميل مباشرة).
+
+## SIGTERM في السجلات
+
+طبيعي عند إعادة نشر Hostinger — البوت يعيد التشغيل. انتظر `bot ready` ثم اختبر الرابط.

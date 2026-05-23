@@ -53,6 +53,8 @@ const env = cleanEnv(process.env, {
   REQUIRED_CHANNEL_ENABLED: bool({ default: false }),
   REQUIRED_CHANNEL: str({ default: '' }),
   REQUIRED_CHANNEL_LINK: str({ default: '' }),
+  YTDLP_PATH: str({ default: '' }),
+  SKIP_YTDLP_PROBE: bool({ default: false }),
 })
 
 const envApi = {
@@ -62,6 +64,10 @@ const envApi = {
   },
   get WEBHOOK_URL() {
     return env.WEBHOOK_URL.trim().replace(/\/$/, '')
+  },
+  get YTDLP_PATH_RESOLVED() {
+    const custom = env.YTDLP_PATH.trim()
+    return custom || undefined
   },
   get isDevelopment() {
     return env.ENVIRONMENT === 'development'

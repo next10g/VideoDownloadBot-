@@ -7,6 +7,9 @@ import mongoose from 'mongoose'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
 import { TEMP_ROOT } from '@/helpers/tempDir'
+import { initYtdlpBinary } from '@/services/ytdlpBinary'
+import { formatYtdlpError, runYtdlpJson } from '@/services/ytdlpRunner'
+import { buildProbeFlags } from '@/services/ytdlpOptions'
 
 const execFileAsync = promisify(execFile)
 
@@ -85,13 +88,30 @@ export async function runStartupChecks(): Promise<StartupCheckResult> {
     )
   }
 
-  const ytdlpPath = '/tmp/yt-dlp'
-  const ytdlpOk = await checkYtdlpBinary(ytdlpPath)
-  if (ytdlpOk) {
-    logger.info('startup: yt-dlp ok', { path: ytdlpPath })
-  } else {
+  try {
+    const ytdlpPath = await initYtdlpBinary()
+    const versionOk = await checkYtdlpBinary(ytdlpPath)
+    if (!versionOk) {
+      errors.push(`yt-dlp --version failed at ${ytdlpPath}`)
+    } else {
+      logger.info('startup: yt-dlp ok', { path: ytdlpPath })
+      try {
+        await runYtdlpJson(
+          'https://www.youtube.com/watch?v=jNQXAC9IVRw',
+          buildProbeFlags(),
+          60_000,
+          'startup-probe'
+        )
+        logger.info('startup: yt-dlp youtube probe ok')
+      } catch (probeError) {
+        warnings.push(
+          `yt-dlp YouTube probe failed: ${formatYtdlpError(probeError)} — downloads may fail if outbound network is blocked`
+        )
+      }
+    }
+  } catch (error) {
     errors.push(
-      `yt-dlp failed at ${ytdlpPath} — check if ensure-ytdlp.js ran correctly`
+      `yt-dlp not available: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 

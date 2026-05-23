@@ -11,7 +11,6 @@ export function buildProbeFlags(): YtDlpFlags {
     ...baseFlags(),
     skipDownload: true,
     dumpSingleJson: true,
-    simulate: true,
   }
 }
 
@@ -47,6 +46,9 @@ function baseFlags(): YtDlpFlags {
     matchFilter: env.YTDLP_MATCH_FILTER,
     abortOnUnavailableFragment: true,
     hlsPreferNative: true,
+    forceIpv4: true,
+    // Shared hosting: avoid Node-based YouTube challenge path when possible
+    extractorArgs: 'youtube:player_client=android,web',
   }
   if (existsSync(cookiePath)) {
     flags.cookies = cookiePath
