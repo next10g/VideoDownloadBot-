@@ -2,6 +2,12 @@ import { readdir } from 'fs/promises'
 import { basename, dirname } from 'path'
 import logger from '@/lib/logger'
 import env from '@/helpers/env'
+import { downloadPipedYoutube } from '@/services/pipedYoutube'
+import {
+  usePipedForYoutube,
+  useYtdlpForYoutube,
+  youtubeBackendMode,
+} from '@/services/youtubeBackend'
 import {
   cookiePoolSize,
   isYoutubeCookiesInvalid,
@@ -79,7 +85,7 @@ function isRetryableYoutubeFailure(message: string, stderr: string): boolean {
   )
 }
 
-export async function runYoutubeDownload(
+async function runYtdlpYoutubeDownload(
   url: string,
   outputBase: string,
   audio: boolean,
@@ -92,7 +98,7 @@ export async function runYoutubeDownload(
   for (const strategy of strategies) {
     const flags = buildFlagsForYoutubeStrategy(outputBase, audio, strategy)
     try {
-      logger.info('youtube strategy attempt', { jobId, strategy: strategy.id })
+      logger.info('youtube yt-dlp strategy', { jobId, strategy: strategy.id })
       const result = await runYtdlpDownload(url, flags, timeoutMs, 'download')
       if (!(await hasDownloadArtifact(outputBase))) {
         logger.warn('youtube strategy produced no file', {
@@ -108,36 +114,58 @@ export async function runYoutubeDownload(
       return result
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      const stderr = error instanceof Error && 'stderr' in error ? String(error.stderr) : ''
       lastError = error instanceof Error ? error : new Error(message)
-      if (!isRetryableYoutubeFailure(message, stderr)) {
+      if (!isRetryableYoutubeFailure(message, '')) {
         throw lastError
       }
-      logger.warn('youtube strategy blocked', { jobId, strategy: strategy.id })
+      logger.warn('youtube yt-dlp blocked', { jobId, strategy: strategy.id })
     }
   }
 
   const detail = lastError?.message ?? ''
   if (isYoutubeCookiesInvalid(detail)) {
     logger.error(
-      'cookies.txt expired or rotated — re-export from Chrome while logged into YouTube. See docs/YOUTUBE-COOKIES.md'
+      'cookies.txt expired — not needed if YOUTUBE_BACKEND=piped. See docs/YOUTUBE-PUBLIC-BOT.md'
     )
   }
   throw lastError ?? new Error('YouTube download failed')
 }
 
-export function logYoutubePublicMode(): void {
-  const pool = cookiePoolSize()
-  const poToken = Boolean(env.YTDLP_YOUTUBE_PO_TOKEN.trim())
-  if (shouldUseYoutubeCookies()) {
-    logger.info('YouTube mode: cookies first', { pool, poToken })
-    return
+/** YouTube for public bots: Piped API (no cookies) with optional yt-dlp fallback. */
+export async function runYoutubeDownload(
+  url: string,
+  outputBase: string,
+  audio: boolean,
+  jobId: string,
+  timeoutMs: number
+): Promise<YtdlpDownloadResult> {
+  if (usePipedForYoutube()) {
+    try {
+      logger.info('youtube piped download', { jobId })
+      return await downloadPipedYoutube(url, outputBase, audio, timeoutMs)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      logger.warn('youtube piped failed', { jobId, detail: message })
+      if (!useYtdlpForYoutube()) {
+        throw error instanceof Error ? error : new Error(message)
+      }
+      logger.info('youtube falling back to yt-dlp', { jobId })
+    }
   }
-  logger.info('YouTube mode: public', {
-    cookiesFirst: env.YOUTUBE_COOKIES_FIRST && pool > 0,
-    fallbackCookies: env.YOUTUBE_FALLBACK_COOKIES && pool > 0,
+
+  return runYtdlpYoutubeDownload(url, outputBase, audio, jobId, timeoutMs)
+}
+
+export function logYoutubePublicMode(): void {
+  const mode = youtubeBackendMode()
+  const pool = cookiePoolSize()
+  logger.info('YouTube backend', {
+    mode,
+    pipedApis: env.PIPED_API_URLS.length || 'default list',
+    maxHeight: env.YOUTUBE_MAX_HEIGHT,
     cookiePoolSize: pool,
-    poToken,
+    cookiesEnabled:
+      env.YOUTUBE_FALLBACK_COOKIES || env.YOUTUBE_USE_COOKIES,
     userCooldownSec: env.YOUTUBE_USER_COOLDOWN_SECONDS,
   })
 }

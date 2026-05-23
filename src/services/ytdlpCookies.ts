@@ -3,6 +3,7 @@ import { join, resolve } from 'path'
 import { cwd } from 'process'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
+import { useYtdlpForYoutube } from '@/services/youtubeBackend'
 
 let loggedPath: string | undefined
 let cookiePool: string[] | undefined
@@ -13,6 +14,9 @@ export function shouldUseYoutubeCookies(): boolean {
 }
 
 export function shouldLoadYoutubeCookiePool(): boolean {
+  if (!useYtdlpForYoutube()) {
+    return false
+  }
   return shouldUseYoutubeCookies() || env.YOUTUBE_FALLBACK_COOKIES
 }
 

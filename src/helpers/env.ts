@@ -61,17 +61,28 @@ const env = cleanEnv(process.env, {
   REQUIRED_CHANNEL_LINK: str({ default: '' }),
   YTDLP_PATH: str({ default: '' }),
   FFMPEG_PATH: str({ default: '' }),
+  YOUTUBE_BACKEND: str({
+    choices: ['piped', 'ytdlp', 'auto'],
+    default: 'piped',
+    desc: 'piped = no cookies (public bot). auto = piped then yt-dlp',
+  }),
+  PIPED_API_URLS: commaList({
+    default: [],
+    desc: 'Optional Piped API bases (comma-separated). Empty = built-in public instances',
+  }),
+  PIPED_API_TIMEOUT_MS: num({ default: 45_000 }),
+  YOUTUBE_MAX_HEIGHT: num({ default: 720 }),
   YOUTUBE_USE_COOKIES: bool({
     default: false,
-    desc: 'Try admin cookies before anonymous clients (not for large public bots)',
+    desc: 'yt-dlp only: try admin cookies (not for public bots)',
   }),
   YOUTUBE_FALLBACK_COOKIES: bool({
-    default: true,
-    desc: 'After anonymous clients fail, try cookies.txt / cookies-pool (server-side only)',
+    default: false,
+    desc: 'yt-dlp only: retry with cookies.txt after anonymous clients fail',
   }),
   YOUTUBE_COOKIES_FIRST: bool({
-    default: true,
-    desc: 'When cookies.txt exists, try cookie strategies before anonymous (fewer IP blocks)',
+    default: false,
+    desc: 'yt-dlp only: try cookies before anonymous clients',
   }),
   YOUTUBE_COOKIE_POOL_DIR: str({
     default: '',

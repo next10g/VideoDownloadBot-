@@ -1,6 +1,9 @@
 import env from '@/helpers/env'
+import { isYoutubeUrl } from '@/helpers/youtubeUrl'
 import { ValidationError } from '@/lib/errors'
 import logger from '@/lib/logger'
+import { probePipedYoutube } from '@/services/pipedYoutube'
+import { usePipedForYoutube } from '@/services/youtubeBackend'
 import { isYoutubeBotBlock } from '@/services/ytdlpCookies'
 import { buildProbeFlags } from '@/services/ytdlpOptions'
 import { formatYtdlpError, runYtdlpJson } from '@/services/ytdlpRunner'
@@ -66,6 +69,20 @@ export function validateMetadata(meta: YtDlpMetadata, url: string): void {
 }
 
 export async function probeUrlMetadata(url: string): Promise<YtDlpMetadata> {
+  if (isYoutubeUrl(url) && usePipedForYoutube()) {
+    try {
+      return await probePipedYoutube(url)
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        throw error
+      }
+      logger.warn('piped probe failed, trying yt-dlp', {
+        url,
+        detail: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
   try {
     const raw = await runYtdlpJson(
       url,
