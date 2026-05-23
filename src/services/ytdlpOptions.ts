@@ -39,7 +39,7 @@ export function buildDownloadFlags(outputBase: string, audio: boolean): YtDlpFla
     writeInfoJson: true,
     format: audio
       ? `bestaudio[filesize<=${maxFilesize}]/bestaudio[filesize_approx<=${maxFilesize}]/bestaudio`
-      : `[filesize<=${maxFilesize}][ext=mp4]/[filesize_approx<=${maxFilesize}][ext=mp4]/[filesize<=${maxFilesize}]/[filesize_approx<=${maxFilesize}]/best[filesize<=${maxFilesize}]/best`,
+      : `best[ext=mp4][filesize<=${maxFilesize}]/best[filesize<=${maxFilesize}]/bestvideo*+bestaudio/best`,
   }
 
   if (ffmpeg) {

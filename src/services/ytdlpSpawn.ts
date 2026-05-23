@@ -34,8 +34,8 @@ function spawnYtdlp(
   flags: YtDlpFlags,
   timeoutMs: number,
   label: string,
-  expectJson: boolean
-): Promise<YtDlpMetadata | void> {
+  mode: 'json' | 'download'
+): Promise<YtDlpMetadata | YtdlpDownloadResult> {
   const args = [...flagsToArgs(flags), url]
 
   return new Promise((resolve, reject) => {
@@ -70,8 +70,13 @@ function spawnYtdlp(
       clearTimeout(timer)
       activeChildren.delete(child)
       if (code === 0) {
-        if (!expectJson) {
-          resolve()
+        if (mode === 'download') {
+          const errText = stderr.trim()
+          if (/ERROR:/i.test(errText)) {
+            reject(new Error(errText.slice(0, 800)))
+            return
+          }
+          resolve({ stderr: errText })
           return
         }
         const trimmed = stdout.trim()
@@ -107,7 +112,11 @@ function spawnYtdlpJson(
   timeoutMs: number,
   label: string
 ): Promise<YtDlpMetadata> {
-  return spawnYtdlp(binary, url, flags, timeoutMs, label, true) as Promise<YtDlpMetadata>
+  return spawnYtdlp(binary, url, flags, timeoutMs, label, 'json') as Promise<YtDlpMetadata>
+}
+
+export interface YtdlpDownloadResult {
+  stderr: string
 }
 
 function spawnYtdlpDownload(
@@ -116,8 +125,15 @@ function spawnYtdlpDownload(
   flags: YtDlpFlags,
   timeoutMs: number,
   label: string
-): Promise<void> {
-  return spawnYtdlp(binary, url, flags, timeoutMs, label, false) as Promise<void>
+): Promise<YtdlpDownloadResult> {
+  return spawnYtdlp(
+    binary,
+    url,
+    flags,
+    timeoutMs,
+    label,
+    'download'
+  ) as Promise<YtdlpDownloadResult>
 }
 
 async function withYtdlpRetry<T>(
@@ -160,7 +176,7 @@ export async function runYtdlpDownload(
   flags: YtDlpFlags,
   timeoutMs: number,
   label: string
-): Promise<void> {
+): Promise<YtdlpDownloadResult> {
   return withYtdlpRetry((binary) =>
     spawnYtdlpDownload(binary, url, flags, timeoutMs, label)
   )

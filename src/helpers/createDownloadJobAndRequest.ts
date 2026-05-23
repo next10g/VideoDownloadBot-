@@ -117,6 +117,8 @@ export default async function createDownloadJobAndRequest(
       await downloadMessageEditor.editMessage(ctx.i18n.t('status_downloading'))
       downloadJob.status = DownloadJobStatus.downloading
       await downloadJob.save()
+    } else if (downloadJob.status === DownloadJobStatus.downloading) {
+      await downloadMessageEditor.editMessage(ctx.i18n.t('status_downloading'))
     } else {
       await downloadMessageEditor.editMessage(ctx.i18n.t('status_queued'))
     }

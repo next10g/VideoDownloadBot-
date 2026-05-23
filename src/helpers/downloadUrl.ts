@@ -41,21 +41,41 @@ async function readInfoJson(
   }
 }
 
+const MEDIA_EXTENSIONS = [
+  '.mp4',
+  '.webm',
+  '.mkv',
+  '.m4a',
+  '.mp3',
+  '.opus',
+  '.aac',
+  '.flac',
+]
+
+function isMediaFile(name: string): boolean {
+  if (name.endsWith('.part') || name.endsWith('.info.json')) {
+    return false
+  }
+  if (name.endsWith('.jpg') || name.endsWith('.webp') || name.endsWith('.png')) {
+    return false
+  }
+  return MEDIA_EXTENSIONS.some((ext) => name.toLowerCase().endsWith(ext))
+}
+
 async function findMediaFile(
   jobDir: string,
   fileBase: string
 ): Promise<string | undefined> {
   const entries = await readdir(jobDir)
-  const media = entries.filter(
-    (name) =>
-      name.startsWith(`${fileBase}.`) &&
-      !name.endsWith('.info.json') &&
-      !name.endsWith('.jpg') &&
-      !name.endsWith('.webp') &&
-      !name.endsWith('.png')
+  const prefixed = entries.filter(
+    (name) => name.startsWith(`${fileBase}.`) && isMediaFile(name)
   )
-  if (media.length === 1) {
-    return join(jobDir, media[0])
+  if (prefixed.length === 1) {
+    return join(jobDir, prefixed[0])
+  }
+  const any = entries.filter(isMediaFile)
+  if (any.length === 1) {
+    return join(jobDir, any[0])
   }
   return undefined
 }
@@ -92,30 +112,41 @@ async function assertFileWithinLimits(filePath: string): Promise<number> {
 export default async function downloadUrl(
   downloadJob: DocumentType<DownloadJob>
 ): Promise<void> {
-  const fileBase = `file-${Date.now()}`
+  const fileBase = `dl-${String(downloadJob.id)}`
   let jobDir = ''
   try {
     jobDir = await createJobTempDir(fileBase)
-    const outputBase = join(jobDir, fileBase)
+    const outputBase = join(jobDir, 'video')
     const options = buildDownloadFlags(outputBase, downloadJob.audio)
 
-    logger.info('download start', { url: downloadJob.url, jobId: downloadJob.id })
-    await runYtdlpDownload(
+    logger.info('download start', { url: downloadJob.url, jobId: downloadJob.id, jobDir })
+    const ytdlpResult = await runYtdlpDownload(
       downloadJob.url,
       options,
       env.DOWNLOAD_TIMEOUT_MS,
       'download'
     )
 
-    const info = await readInfoJson(jobDir, fileBase)
+    const entries = await readdir(jobDir)
+    logger.info('download dir after yt-dlp', {
+      jobId: downloadJob.id,
+      entries,
+      stderr: ytdlpResult.stderr.slice(0, 400),
+    })
+
+    const info = await readInfoJson(jobDir, 'video')
     let filePath: string
     if (info) {
       validateMetadata(info, downloadJob.url)
-      filePath = await resolveDownloadedPath(info, jobDir, fileBase)
+      filePath = await resolveDownloadedPath(info, jobDir, 'video')
     } else {
-      const found = await findMediaFile(jobDir, fileBase)
+      const found = await findMediaFile(jobDir, 'video')
       if (!found) {
-        throw new Error('Download finished but no media or .info.json found')
+        const hint = ytdlpResult.stderr.slice(0, 300) || entries.join(', ') || 'empty'
+        if (isYoutubeBotBlock(hint)) {
+          throw new Error(hint)
+        }
+        throw new Error(`Download produced no file (${hint})`)
       }
       filePath = found
     }
@@ -132,7 +163,7 @@ export default async function downloadUrl(
       downloadJob.audio || !shouldProcessThumbnail(fileSize)
         ? undefined
         : info
-          ? await getThumbnailUrl(info, jobDir, fileBase, fileSize)
+          ? await getThumbnailUrl(info, jobDir, 'video', fileSize)
           : undefined
 
     const fileId = await withTimeout(

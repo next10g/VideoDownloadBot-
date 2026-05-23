@@ -1,7 +1,15 @@
-import { InlineKeyboard } from 'grammy'
+import { InlineKeyboard, GrammyError } from 'grammy'
 import Context from '@/models/Context'
 import bot from '@/helpers/bot'
 import report from '@/helpers/report'
+
+function isMessageNotModified(error: unknown): boolean {
+  return (
+    error instanceof GrammyError &&
+    error.error_code === 400 &&
+    String(error.description).includes('message is not modified')
+  )
+}
 
 export default class MessageEditor {
   constructor(
@@ -33,6 +41,9 @@ export default class MessageEditor {
         throw new Error('No messageId or ctx found when editing')
       }
     } catch (error) {
+      if (isMessageNotModified(error)) {
+        return
+      }
       report(error, {
         ctx: this.ctx,
         location: 'MessageEditor.editMessage',
