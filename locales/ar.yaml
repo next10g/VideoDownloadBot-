@@ -62,7 +62,7 @@ error_user_blocked: 🚫 محاولات فاشلة كتير. جرّب بعد ${m
 error_suspicious_source: 🚫 المصدر ده متوقف مؤقتاً.
 error_retry_spam: ⏳ محاولات كتير. استنى شوية.
 error_retry_no_url: 🔗 ابعت لينك الفيديو تاني عشان نجرّب.
-error_youtube_cooldown: ⏳ يوتيوب: استنى ${seconds} ثانية قبل لينك تاني (البوت عام ومش بيستخدم حسابك).
+error_youtube_cooldown: "⏳ يوتيوب: استنى ${seconds} ثانية قبل لينك تاني (البوت عام ومش بيستخدم حسابك)."
 error_youtube_bot: |
   ▶️ يوتيوب مش متاح دلوقتي من السيرفر (حماية من جوجل).
 
