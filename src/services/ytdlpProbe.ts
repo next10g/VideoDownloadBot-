@@ -1,6 +1,7 @@
 import env from '@/helpers/env'
 import { ValidationError } from '@/lib/errors'
 import logger from '@/lib/logger'
+import { isYoutubeBotBlock } from '@/services/ytdlpCookies'
 import { buildProbeFlags } from '@/services/ytdlpOptions'
 import { formatYtdlpError, runYtdlpJson } from '@/services/ytdlpRunner'
 import type { YtDlpMetadata } from '@/services/ytdlpTypes'
@@ -86,15 +87,8 @@ export async function probeUrlMetadata(url: string): Promise<YtDlpMetadata> {
     if (message.includes('No video formats')) {
       throw new ValidationError(message, 'unsupported')
     }
-    if (
-      message.includes('Sign in') ||
-      message.includes('bot') ||
-      message.includes('403')
-    ) {
-      throw new ValidationError(
-        'YouTube blocked this server. Try again later or use a cookie file.',
-        'unsupported'
-      )
+    if (isYoutubeBotBlock(message)) {
+      throw new ValidationError('YouTube bot check on server', 'youtube_bot')
     }
     logger.warn('yt-dlp probe failed', { url, detail: message })
     throw new ValidationError(

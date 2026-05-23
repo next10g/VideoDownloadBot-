@@ -11,6 +11,7 @@ export type ValidationErrorCode =
   | 'blacklist'
   | 'user_blocked'
   | 'suspicious_extractor'
+  | 'youtube_bot'
 
 export class ValidationError extends Error {
   constructor(

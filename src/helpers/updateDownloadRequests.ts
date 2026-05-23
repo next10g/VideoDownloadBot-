@@ -23,6 +23,7 @@ const FAILURE_STATUSES = new Set([
   DownloadJobStatus.failedUpload,
   DownloadJobStatus.unsupportedUrl,
   DownloadJobStatus.noSuitableVideoSize,
+  DownloadJobStatus.failedYoutubeBot,
 ])
 
 async function getDownloadRequestsChatsAndEditors(
@@ -121,6 +122,8 @@ function failureMessageKey(status: DownloadJobStatus): string {
       return 'error_unsupported_url'
     case DownloadJobStatus.noSuitableVideoSize:
       return 'error_no_suitable_video_size'
+    case DownloadJobStatus.failedYoutubeBot:
+      return 'error_youtube_bot'
     default:
       return 'error_video_download'
   }

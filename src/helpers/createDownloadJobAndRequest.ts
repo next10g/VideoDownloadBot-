@@ -56,7 +56,11 @@ export default async function createDownloadJobAndRequest(
       try {
         await probeUrlMetadata(checkedUrl)
       } catch (probeError) {
-        if (env.SOFT_YTDLP_PROBE && isValidationError(probeError)) {
+        if (
+          env.SOFT_YTDLP_PROBE &&
+          isValidationError(probeError) &&
+          probeError.code !== 'youtube_bot'
+        ) {
           logger.warn('soft probe: continuing to download', {
             url: checkedUrl,
             code: probeError.code,

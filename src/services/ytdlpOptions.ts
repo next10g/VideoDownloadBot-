@@ -1,11 +1,24 @@
-import { existsSync } from 'fs'
-import { resolve } from 'path'
-import { cwd } from 'process'
 import env from '@/helpers/env'
 import { getFfmpegPath } from '@/services/ffmpegPath'
+import { resolveCookiesPath } from '@/services/ytdlpCookies'
 import type { YtDlpFlags } from '@/services/ytdlpTypes'
 
 const maxFilesize = `${env.MAX_FILE_SIZE_MB}M`
+
+let cachedCookiesPath: string | undefined
+let cookiesResolved = false
+
+async function ensureCookiesPath(): Promise<void> {
+  if (!cookiesResolved) {
+    cachedCookiesPath = await resolveCookiesPath()
+    cookiesResolved = true
+  }
+}
+
+/** Call at startup so downloads include cookies when cookie file exists. */
+export async function initYtdlpOptions(): Promise<void> {
+  await ensureCookiesPath()
+}
 
 export function buildProbeFlags(): YtDlpFlags {
   return {
@@ -39,15 +52,17 @@ export function buildDownloadFlags(outputBase: string, audio: boolean): YtDlpFla
       flags.convertThumbnails = 'jpg'
     }
   } else if (thumbs) {
-    // Raw thumbnail only — no ffmpeg conversion
     flags.writeThumbnail = true
   }
 
   return flags
 }
 
+function youtubeExtractorArgs(): string {
+  return 'youtube:player_client=android,ios,tv,web;player_skip=webpage,configs'
+}
+
 function baseFlags(): YtDlpFlags {
-  const cookiePath = resolve(cwd(), 'cookie')
   const flags: YtDlpFlags = {
     noWarnings: true,
     noCheckCertificate: true,
@@ -57,17 +72,17 @@ function baseFlags(): YtDlpFlags {
     noCacheDir: true,
     noPart: true,
     concurrentFragments: 1,
-    retries: 2,
-    fragmentRetries: 2,
+    retries: 3,
+    fragmentRetries: 3,
     socketTimeout: 30,
     matchFilter: env.YTDLP_MATCH_FILTER,
     abortOnUnavailableFragment: true,
     hlsPreferNative: true,
     forceIpv4: true,
-    extractorArgs: 'youtube:player_client=android,web',
+    extractorArgs: youtubeExtractorArgs(),
   }
-  if (existsSync(cookiePath)) {
-    flags.cookies = cookiePath
+  if (cachedCookiesPath) {
+    flags.cookies = cachedCookiesPath
   }
   const ffmpeg = getFfmpegPath()
   if (ffmpeg) {

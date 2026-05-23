@@ -188,6 +188,18 @@ SKIP_THUMBNAILS=true
 
 ثم أعد النشر وجرب TikTok مرة أخرى (ابحث في السجلات عن `upload complete`).
 
+## YouTube: `Sign in to confirm you're not a bot`
+
+يوتيوب يحجب IP السيرفر. **TikTok** غالباً يشتغل بدون كوكيز.
+
+ارفع ملف `cookie` (كوكيز Netscape من المتصفح) في مجلد `nodejs/` — شرح كامل: [docs/YOUTUBE-COOKIES.md](YOUTUBE-COOKIES.md)
+
+```bash
+# بعد الرفع
+chmod 600 cookie
+# أعد تشغيل البوت — في السجلات: "yt-dlp cookies file"
+```
+
 ## SIGTERM في السجلات
 
 طبيعي عند إعادة نشر Hostinger — البوت يعيد التشغيل. انتظر `bot ready` ثم اختبر الرابط.

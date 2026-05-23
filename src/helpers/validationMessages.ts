@@ -15,6 +15,7 @@ const KEY_BY_CODE: Record<ValidationError['code'], string> = {
   blacklist: 'error_blacklisted_domain',
   user_blocked: 'error_user_blocked',
   suspicious_extractor: 'error_suspicious_source',
+  youtube_bot: 'error_youtube_bot',
 }
 
 export function validationMessage(ctx: Context, error: ValidationError): string {

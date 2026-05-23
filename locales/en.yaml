@@ -60,6 +60,11 @@ error_user_blocked: 🚫 Too many failed attempts. Try again in ${minutes} min.
 error_suspicious_source: 🚫 This source is temporarily restricted.
 error_retry_spam: ⏳ Too many retries. Wait a moment.
 error_retry_no_url: 🔗 Send the video link again to retry.
+error_youtube_bot: |
+  ▶️ YouTube blocked the server (login required).
+
+  Upload a <code>cookie</code> file to the bot folder (YouTube cookies from your browser).
+  Contact @Dev_Nour_M if you need help.
 error_private_bot: |
   🔒 This bot is <b>private</b> for Nour Mohamed only (@Dev_Nour_M).
 

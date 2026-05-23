@@ -53,6 +53,12 @@ export async function findOrCreateDownloadRequest(
         buildRetryKeyboard(doc.language)
       )
       break
+    case DownloadJobStatus.failedYoutubeBot:
+      await editor.editMessage(
+        i18n.t(doc.language, 'error_youtube_bot'),
+        buildRetryKeyboard(doc.language)
+      )
+      break
     case DownloadJobStatus.finished: {
       const url = await findUrl(downloadJob.url, downloadJob.audio)
       if (!url) {

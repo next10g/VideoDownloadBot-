@@ -57,6 +57,7 @@ export default async function cleanupDownloadJobs() {
         DownloadJobStatus.failedUpload,
         DownloadJobStatus.unsupportedUrl,
         DownloadJobStatus.noSuitableVideoSize,
+        DownloadJobStatus.failedYoutubeBot,
       ],
     },
   })

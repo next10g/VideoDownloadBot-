@@ -62,6 +62,11 @@ error_user_blocked: 🚫 محاولات فاشلة كتير. جرّب بعد ${m
 error_suspicious_source: 🚫 المصدر ده متوقف مؤقتاً.
 error_retry_spam: ⏳ محاولات كتير. استنى شوية.
 error_retry_no_url: 🔗 ابعت لينك الفيديو تاني عشان نجرّب.
+error_youtube_bot: |
+  ▶️ يوتيوب بيمنع السيرفر (محتاج تسجيل دخول).
+
+  المطور لازم يرفع ملف <code>cookie</code> في مجلد البوت (كوكيز يوتيوب من المتصفح).
+  تواصل مع @Dev_Nour_M لو محتاج مساعدة.
 error_private_bot: |
   🔒 البوت ده <b>خاص</b> بـ Nour Mohamed بس (@Dev_Nour_M).
 

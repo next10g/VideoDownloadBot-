@@ -61,6 +61,10 @@ const env = cleanEnv(process.env, {
   REQUIRED_CHANNEL_LINK: str({ default: '' }),
   YTDLP_PATH: str({ default: '' }),
   FFMPEG_PATH: str({ default: '' }),
+  COOKIES_PATH: str({
+    default: '',
+    desc: 'Netscape cookies.txt for YouTube (or place file named "cookie" in project root)',
+  }),
   SKIP_YTDLP_PROBE: bool({ default: false }),
   SOFT_YTDLP_PROBE: bool({
     default: true,
@@ -82,6 +86,10 @@ const envApi = {
   },
   get FFMPEG_PATH_RESOLVED() {
     const custom = env.FFMPEG_PATH.trim()
+    return custom || undefined
+  },
+  get COOKIES_PATH_RESOLVED() {
+    const custom = env.COOKIES_PATH.trim()
     return custom || undefined
   },
   get isDevelopment() {
