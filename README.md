@@ -1,57 +1,31 @@
 # Video Download Bot
 
-Telegram bot that downloads videos and sends them in chat. Optimized for **webhook mode** and **Hostinger**.
+Telegram video download bot — webhook mode, optimized for **Hostinger**.
 
----
-
-## Hostinger deploy (required settings)
+## Hostinger (important)
 
 | Setting | Value |
 |---------|--------|
-| **Node.js** | **20** |
-| **Package manager** | **Yarn** |
-| **Install** | `node scripts/hostinger-install.js` |
-| **Build** | `yarn build-ts` |
-| **Start** | `node dist/app.js` |
+| Node.js | **20** |
+| Package manager | **npm** (not Yarn — avoids `--non-interactive` error) |
+| Install | `node scripts/hostinger-install.js` |
+| Build | `npm run build-ts` |
+| Start | `node dist/app.js` |
 
-Environment variable:
+Env: `YOUTUBE_DL_SKIP_PYTHON_CHECK=1`
 
-```
-YOUTUBE_DL_SKIP_PYTHON_CHECK=1
-```
+Full guide: [docs/HOSTINGER.md](docs/HOSTINGER.md)
 
-Details: [docs/HOSTINGER.md](docs/HOSTINGER.md) (Arabic + English)
-
----
-
-## Local development
-
-Requires **Node.js 20+** and **Yarn 4** (bundled in repo).
+## Local setup
 
 ```bash
 cp .env.sample .env
 node scripts/hostinger-install.js
-yarn build-ts
-yarn distribute
+npm run build-ts
+npm run distribute
 ```
 
----
-
-## Environment variables
-
-See [.env.sample](.env.sample). Required: `TOKEN`, `MONGO`, `ADMIN_ID` (numeric), `WEBHOOK_URL`, `WEBHOOK_SECRET`.
-
----
-
-## Scripts
-
-| Command | Purpose |
-|---------|---------|
-| `yarn hostinger:install` | Install deps (Hostinger / no Python) |
-| `yarn build-ts` | Compile TypeScript |
-| `yarn distribute` | Run bot |
-
----
+Requires Node.js **20+**.
 
 ## License
 

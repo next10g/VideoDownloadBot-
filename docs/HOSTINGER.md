@@ -1,62 +1,64 @@
-# Hostinger — إعداد البناء / Build settings
+# Hostinger — إعداد النشر
 
-## إعدادات hPanel (مهم)
+## المشكلة: Yarn `--non-interactive`
 
-في **Websites → Node.js → Deploy**:
+Hostinger يشغّل `yarn install --non-interactive` وهذا **ملغى في Yarn 4** فيفشل التثبيت.
+
+**الحل:** استخدم **npm** وليس Yarn في لوحة Hostinger.
+
+---
+
+## إعدادات hPanel
 
 | الحقل | القيمة |
 |--------|--------|
 | **Node.js version** | **20** |
-| **Package manager** | **Yarn** |
+| **Package manager** | **npm** (مهم — ليس Yarn) |
 | **Install command** | `node scripts/hostinger-install.js` |
-| **Build command** | `yarn build-ts` |
+| **Build command** | `npm run build-ts` |
 | **Start command** | `node dist/app.js` |
 
-### متغيرات البيئة (Environment)
+### متغيرات البيئة
 
 ```
 YOUTUBE_DL_SKIP_PYTHON_CHECK=1
 TOKEN=...
-MONGO=mongodb+srv://...
+MONGO=mongodb+srv://user:PASSWORD@cluster.mongodb.net/video-download-bot
 ADMIN_ID=123456789
 WEBHOOK_URL=https://t.nextegypt-agri.com
 WEBHOOK_SECRET=...
 PORT=3000
 ```
 
-`ADMIN_ID` = رقم المستخدم من [@userinfobot](https://t.me/userinfobot) وليس @اسم_البوت.
+- `ADMIN_ID` = رقم من [@userinfobot](https://t.me/userinfobot)
+- استبدل `PASSWORD` في `MONGO` (بدون `<db_password>`)
 
 ---
 
-## أسباب فشل البناء الشائعة
+## الملفات في Git
 
-| الخطأ | الحل |
-|--------|-----|
-| packageManager yarn لكن npm يُستخدم | اختر **Yarn** في لوحة Hostinger |
-| `null-prototype-object` يحتاج Node 20 | اختر **Node 20** |
-| `youtube-dl-exec needs Python` | `YOUTUBE_DL_SKIP_PYTHON_CHECK=1` + `hostinger-install.js` |
+| ملف | مطلوب |
+|-----|--------|
+| `package-lock.json` | نعم (npm) |
+| `yarn.lock` | اختياري للتطوير المحلي فقط — احذفه من Git إذا أردت npm فقط |
+| `.yarn/` | اختياري — غير مطلوب على Hostinger |
 
----
-
-## ملفات المشروع التي تدعم Hostinger
-
-- `.node-version` → `20`
-- `.nvmrc` → `20`
-- `packageManager`: `yarn@4.1.1`
-- `.yarn/releases/yarn-4.1.1.cjs` (Yarn مضمّن — لا حاجة لتثبيت Yarn عالمياً)
+إذا وُجد `package-lock.json` و`yarn.lock` معاً، احذف `yarn.lock` من المستودع أو تجاهل Yarn في Hostinger.
 
 ---
 
-## بعد النشر
+## أوامر يدوية (SSH)
 
 ```bash
-curl https://t.nextegypt-agri.com/health
-curl https://t.nextegypt-agri.com/diagnostics
+export YOUTUBE_DL_SKIP_PYTHON_CHECK=1
+node scripts/hostinger-install.js
+npm run build-ts
+node dist/app.js
 ```
 
 ---
 
-## `.env` موصى به على الاستضافة المشتركة
+## `.env` موصى به
 
 ```env
 MAX_FILE_SIZE_MB=200
