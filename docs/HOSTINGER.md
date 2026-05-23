@@ -60,25 +60,30 @@ node --version
 
 أو استخدم المسار الكامل من hPanel (Node 20).
 
-### تثبيت yt-dlp بدون Node (موصى به)
+### تثبيت yt-dlp (SSH)
 
-Hostinger يعطي **Python 3.6** فقط — ملف `yt-dlp` العادي (سكربت بايثون) **لا يعمل**. استخدم النسخة المستقلة `yt-dlp_linux`:
+Hostinger غالباً:
+
+- **Python 3.6** في النظام — لا يكفي لـ yt-dlp
+- **`yt-dlp_linux`** يفشل بـ `libz.so.1: failed to map segment` (قيود الاستضافة)
+
+**الحل:** سكربت التثبيت يجرّب standalone ثم يبني **غلاف Python 3.10+** (alt-python):
 
 ```bash
 cd ~/domains/t.nextegypt-agri.com/nodejs
 bash scripts/install-ytdlp.sh
 ```
 
-إذا `bin/yt-dlp` مجلد وليس ملفاً:
+إذا لم يجد Python 3.10، جرّب يدوياً:
 
 ```bash
-rm -rf bin/yt-dlp
-curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o bin/yt-dlp
-chmod +x bin/yt-dlp
+/opt/alt/alt-python311/bin/python3.11 --version
+export YTDLP_PYTHON=/opt/alt/alt-python311/bin/python3.11
+bash scripts/install-ytdlp.sh
 bin/yt-dlp --version
 ```
 
-يجب أن يطبع رقم إصدار (مثل `2025.xx.xx`) بدون خطأ Python.
+يجب أن يطبع رقم إصدار بدون Traceback وبدون خطأ `libz`.
 
 ### باقي الأوامر (بعد تفعيل Node في PATH)
 
@@ -116,7 +121,7 @@ NODE_OPTIONS=--max-old-space-size=384
 bash scripts/install-ytdlp.sh
 ```
 
-لا تستخدم ملف `yt-dlp` من GitHub (سكربت Python) — استخدم **`yt-dlp_linux`** فقط.
+استخدم `bash scripts/install-ytdlp.sh` — لا تثبّت `yt-dlp_linux` يدوياً إلا إذا نجح `--version` بدون خطأ `libz`.
 
 في hPanel **احذف** `YTDLP_PATH=/tmp/yt-dlp` إن وُجد. اترك المتغير فارغاً أو ضعه على:
 `/home/u987639727/domains/t.nextegypt-agri.com/nodejs/bin/yt-dlp` (عدّل المسار حسب مجلدك).

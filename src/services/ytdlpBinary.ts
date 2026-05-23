@@ -3,22 +3,12 @@ import { constants as fsConstants } from 'fs'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { dirname, join } from 'path'
-import { cwd, platform } from 'process'
+import { cwd } from 'process'
 import { tmpdir } from 'os'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
 
 const execFileAsync = promisify(execFile)
-
-function releaseAssetName(): string {
-  if (platform === 'win32') return 'yt-dlp.exe'
-  if (platform === 'darwin') return 'yt-dlp_macos'
-  return 'yt-dlp_linux'
-}
-
-function ytdlpDownloadUrl(): string {
-  return `https://github.com/yt-dlp/yt-dlp/releases/latest/download/${releaseAssetName()}`
-}
 
 let cachedPath: string | undefined
 
@@ -66,7 +56,7 @@ export async function isYtdlpRunnable(filePath: string): Promise<boolean> {
   }
   await tryChmodExecutable(filePath)
   try {
-    await execFileAsync(filePath, ['--version'], { timeout: 15_000 })
+    await execFileAsync(filePath, ['--version'], { timeout: 30_000 })
     return true
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -75,25 +65,21 @@ export async function isYtdlpRunnable(filePath: string): Promise<boolean> {
   }
 }
 
-async function prepareDest(dest: string): Promise<void> {
+async function prepareBrokenDest(dest: string): Promise<void> {
   if (!(await fileExists(dest))) {
     return
   }
   try {
     const info = await stat(dest)
     if (info.isDirectory()) {
-      logger.warn('Removing bin/yt-dlp directory; replacing with standalone binary', {
-        path: dest,
-      })
       await rm(dest, { recursive: true, force: true })
       return
     }
     if (!(await isYtdlpRunnable(dest))) {
-      logger.warn('Removing broken yt-dlp file', { path: dest })
       await unlink(dest)
     }
   } catch (error) {
-    logger.warn('prepareDest failed', {
+    logger.warn('prepareBrokenDest failed', {
       path: dest,
       error: error instanceof Error ? error.message : String(error),
     })
@@ -122,13 +108,32 @@ function getCandidates(): string[] {
   return [...new Set(list)]
 }
 
+/** Runs scripts/ytdlp-install-lib.js (standalone or Python 3.10+ wrapper). */
+export async function installYtdlpBinary(): Promise<string> {
+  const projectRoot = cwd()
+  const dest = projectYtdlpPath()
+  await prepareBrokenDest(dest)
+  logger.info('Running yt-dlp installer', { projectRoot })
+  await execFileAsync('node', [join(projectRoot, 'scripts', 'ytdlp-install-lib.js'), projectRoot], {
+    timeout: 180_000,
+    env: {
+      ...process.env,
+      YTDLP_PYTHON: process.env.YTDLP_PYTHON ?? '',
+    },
+  })
+  if (!(await isYtdlpRunnable(dest))) {
+    throw new Error(
+      `yt-dlp install failed at ${dest}. SSH: bash scripts/install-ytdlp.sh`
+    )
+  }
+  return dest
+}
+
 export async function downloadYtdlpTo(dest: string): Promise<void> {
-  await prepareDest(dest)
-  await mkdir(dirname(dest), { recursive: true })
-  const url = ytdlpDownloadUrl()
-  logger.info('Downloading standalone yt-dlp', { dest, asset: releaseAssetName(), url })
-  await execFileAsync('curl', ['-fsSL', url, '-o', dest], { timeout: 120_000 })
-  await tryChmodExecutable(dest)
+  if (dest !== projectYtdlpPath()) {
+    throw new Error('downloadYtdlpTo only supports project bin/yt-dlp')
+  }
+  await installYtdlpBinary()
 }
 
 export async function resolveYtdlpPath(): Promise<string> {
@@ -158,11 +163,11 @@ export async function resolveYtdlpPath(): Promise<string> {
     return candidate
   }
 
-  await downloadYtdlpTo(projectBin)
+  await installYtdlpBinary()
 
   if (!(await isYtdlpRunnable(projectBin))) {
     throw new Error(
-      `yt-dlp at ${projectBin} is not executable. On SSH run: bash scripts/install-ytdlp.sh`
+      `yt-dlp at ${projectBin} is not executable. SSH: bash scripts/install-ytdlp.sh`
     )
   }
 
