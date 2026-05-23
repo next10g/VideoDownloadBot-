@@ -2,8 +2,8 @@
 'use strict'
 
 /**
- * Downloads yt-dlp for Hostinger/shared hosting.
- * Never fails npm install — chmod/verify errors are warnings only.
+ * Downloads standalone yt-dlp (yt-dlp_linux on Linux — no host Python needed).
+ * Never fails npm install.
  */
 
 const { execFileSync } = require('child_process')
@@ -13,9 +13,18 @@ const os = require('os')
 
 const PROJECT_BIN = path.join(__dirname, '..', 'bin', 'yt-dlp')
 
+function releaseAsset() {
+  if (process.platform === 'win32') return 'yt-dlp.exe'
+  if (process.platform === 'darwin') return 'yt-dlp_macos'
+  return 'yt-dlp_linux'
+}
+
+function downloadUrl() {
+  return `https://github.com/yt-dlp/yt-dlp/releases/latest/download/${releaseAsset()}`
+}
+
 function candidatePaths() {
   const fromEnv = process.env.YTDLP_PATH
-  // Project bin first — /tmp is often noexec on shared hosting
   const list = [
     PROJECT_BIN,
     path.join(process.cwd(), 'bin', 'yt-dlp'),
@@ -26,23 +35,35 @@ function candidatePaths() {
   return [...new Set(list)]
 }
 
+function prepareDest(dest) {
+  if (!fs.existsSync(dest)) {
+    return
+  }
+  const st = fs.statSync(dest)
+  if (st.isDirectory()) {
+    console.log('Removing wrong yt-dlp directory (need a single binary file):', dest)
+    fs.rmSync(dest, { recursive: true, force: true })
+    return
+  }
+  if (!canExecute(dest)) {
+    console.log('Removing broken yt-dlp file:', dest)
+    fs.unlinkSync(dest)
+  }
+}
+
 function ensureDir(filePath) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true })
 }
 
 function download(dest) {
+  prepareDest(dest)
   ensureDir(dest)
-  console.log('Downloading yt-dlp to', dest)
-  execFileSync(
-    'curl',
-    [
-      '-fsSL',
-      'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp',
-      '-o',
-      dest,
-    ],
-    { stdio: 'inherit', timeout: 120_000 }
-  )
+  const url = downloadUrl()
+  console.log('Downloading', releaseAsset(), 'to', dest)
+  execFileSync('curl', ['-fsSL', url, '-o', dest], {
+    stdio: 'inherit',
+    timeout: 120_000,
+  })
 }
 
 function makeExecutable(dest) {
@@ -55,6 +76,9 @@ function makeExecutable(dest) {
 
 function canExecute(dest) {
   try {
+    if (!fs.existsSync(dest) || !fs.statSync(dest).isFile()) {
+      return false
+    }
     makeExecutable(dest)
     const version = execFileSync(dest, ['--version'], {
       encoding: 'utf8',
@@ -97,11 +121,16 @@ function tryYouTubeProbe(dest) {
 function ensureYtdlp() {
   for (const dest of candidatePaths()) {
     try {
+      prepareDest(dest)
       if (!fs.existsSync(dest)) {
+        if (dest !== PROJECT_BIN && dest !== path.join(process.cwd(), 'bin', 'yt-dlp')) {
+          continue
+        }
+        download(dest)
+      } else if (!canExecute(dest)) {
         download(dest)
       } else {
-        console.log('yt-dlp file exists:', dest)
-        makeExecutable(dest)
+        console.log('yt-dlp already OK:', dest)
       }
       if (canExecute(dest)) {
         tryYouTubeProbe(dest)
@@ -112,8 +141,20 @@ function ensureYtdlp() {
       console.warn('ensure-ytdlp path failed:', dest, error.message)
     }
   }
+
+  try {
+    download(PROJECT_BIN)
+    if (canExecute(PROJECT_BIN)) {
+      tryYouTubeProbe(PROJECT_BIN)
+      console.log('ensure-ytdlp success:', PROJECT_BIN)
+      return PROJECT_BIN
+    }
+  } catch (error) {
+    console.warn('ensure-ytdlp download failed:', error.message)
+  }
+
   console.warn(
-    'ensure-ytdlp: no working binary yet. App will retry at startup (bin/yt-dlp or YTDLP_PATH).'
+    'ensure-ytdlp: no working binary yet. On SSH run: bash scripts/install-ytdlp.sh'
   )
   return null
 }

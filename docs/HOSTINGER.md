@@ -49,8 +49,42 @@ PORT=3000
 
 ## أوامر يدوية (SSH)
 
+### `node: command not found`
+
+SSH لا يضيف Node تلقائياً. جرّب:
+
+```bash
+export PATH=/opt/alt/alt-nodejs20/root/usr/bin:$PATH
+node --version
+```
+
+أو استخدم المسار الكامل من hPanel (Node 20).
+
+### تثبيت yt-dlp بدون Node (موصى به)
+
+Hostinger يعطي **Python 3.6** فقط — ملف `yt-dlp` العادي (سكربت بايثون) **لا يعمل**. استخدم النسخة المستقلة `yt-dlp_linux`:
+
+```bash
+cd ~/domains/t.nextegypt-agri.com/nodejs
+bash scripts/install-ytdlp.sh
+```
+
+إذا `bin/yt-dlp` مجلد وليس ملفاً:
+
+```bash
+rm -rf bin/yt-dlp
+curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o bin/yt-dlp
+chmod +x bin/yt-dlp
+bin/yt-dlp --version
+```
+
+يجب أن يطبع رقم إصدار (مثل `2025.xx.xx`) بدون خطأ Python.
+
+### باقي الأوامر (بعد تفعيل Node في PATH)
+
 ```bash
 export YOUTUBE_DL_SKIP_PYTHON_CHECK=1
+export PATH=/opt/alt/alt-nodejs20/root/usr/bin:$PATH
 node scripts/hostinger-install.js
 npm run build-ts
 node dist/app.js
@@ -79,10 +113,10 @@ NODE_OPTIONS=--max-old-space-size=384
 بعد النشر على SSH:
 
 ```bash
-node scripts/ensure-ytdlp.js
-chmod +x bin/yt-dlp
-bin/yt-dlp --version
+bash scripts/install-ytdlp.sh
 ```
+
+لا تستخدم ملف `yt-dlp` من GitHub (سكربت Python) — استخدم **`yt-dlp_linux`** فقط.
 
 في hPanel **احذف** `YTDLP_PATH=/tmp/yt-dlp` إن وُجد. اترك المتغير فارغاً أو ضعه على:
 `/home/u987639727/domains/t.nextegypt-agri.com/nodejs/bin/yt-dlp` (عدّل المسار حسب مجلدك).
