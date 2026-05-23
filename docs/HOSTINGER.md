@@ -1,74 +1,65 @@
-# Hostinger deployment (fix npm install / Python error)
+# Hostinger — إعداد البناء / Build settings
 
-Hostinger **does not have Python** on the build PATH. `youtube-dl-exec` fails with:
+## إعدادات hPanel (مهم)
 
-`youtube-dl-exec needs Python`
+في **Websites → Node.js → Deploy**:
 
-## Solution — change the install command
+| الحقل | القيمة |
+|--------|--------|
+| **Node.js version** | **20** |
+| **Package manager** | **Yarn** |
+| **Install command** | `node scripts/hostinger-install.js` |
+| **Build command** | `yarn build-ts` |
+| **Start command** | `node dist/app.js` |
 
-In **hPanel → Websites → your site → Node.js** (or Git deploy settings), set:
+### متغيرات البيئة (Environment)
 
-### Install command
-
-```bash
-node scripts/hostinger-install.js
+```
+YOUTUBE_DL_SKIP_PYTHON_CHECK=1
+TOKEN=...
+MONGO=mongodb+srv://...
+ADMIN_ID=123456789
+WEBHOOK_URL=https://t.nextegypt-agri.com
+WEBHOOK_SECRET=...
+PORT=3000
 ```
 
-**Or:**
+`ADMIN_ID` = رقم المستخدم من [@userinfobot](https://t.me/userinfobot) وليس @اسم_البوت.
+
+---
+
+## أسباب فشل البناء الشائعة
+
+| الخطأ | الحل |
+|--------|-----|
+| packageManager yarn لكن npm يُستخدم | اختر **Yarn** في لوحة Hostinger |
+| `null-prototype-object` يحتاج Node 20 | اختر **Node 20** |
+| `youtube-dl-exec needs Python` | `YOUTUBE_DL_SKIP_PYTHON_CHECK=1` + `hostinger-install.js` |
+
+---
+
+## ملفات المشروع التي تدعم Hostinger
+
+- `.node-version` → `20`
+- `.nvmrc` → `20`
+- `packageManager`: `yarn@4.1.1`
+- `.yarn/releases/yarn-4.1.1.cjs` (Yarn مضمّن — لا حاجة لتثبيت Yarn عالمياً)
+
+---
+
+## بعد النشر
 
 ```bash
-YOUTUBE_DL_SKIP_PYTHON_CHECK=1 npm install
-```
-
-### Build command
-
-```bash
-npm run build-ts
-```
-
-### Start command
-
-```bash
-node dist/app.js
-```
-
-### Environment variables (hPanel)
-
-Add in the Node.js app settings (not only `.env` file):
-
-| Variable | Value |
-|----------|--------|
-| `YOUTUBE_DL_SKIP_PYTHON_CHECK` | `1` |
-| `TOKEN` | from @BotFather |
-| `MONGO` | MongoDB Atlas URI (real password, not `<db_password>`) |
-| `ADMIN_ID` | **numeric** user id from @userinfobot |
-| `WEBHOOK_URL` | `https://t.nextegypt-agri.com` |
-| `WEBHOOK_SECRET` | your secret |
-| `PORT` | `3000` (or port Hostinger assigns) |
-
-## After first successful install
-
-`scripts/ensure-ytdlp.js` downloads `yt-dlp` into `node_modules/youtube-dl-exec/bin/`.
-
-Verify on server (SSH if available):
-
-```bash
-node node_modules/youtube-dl-exec/bin/yt-dlp --version
 curl https://t.nextegypt-agri.com/health
+curl https://t.nextegypt-agri.com/diagnostics
 ```
 
-## npm warnings (safe to ignore)
+---
 
-- `EBADENGINE null-prototype-object` — needs Node 20+ for that sub-dependency; Node 18 still works.
-- `deprecated inflight/rimraf` — dev tooling only.
-
-## Recommended `.env` on Hostinger
+## `.env` موصى به على الاستضافة المشتركة
 
 ```env
 MAX_FILE_SIZE_MB=200
-MAX_DURATION_SECONDS=3600
 SKIP_THUMBNAILS=true
 NODE_OPTIONS=--max-old-space-size=384
 ```
-
-`SKIP_THUMBNAILS=true` avoids `sharp` native binary issues on some shared hosts.

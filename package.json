@@ -7,12 +7,12 @@
   "author": "backmeupplz <backmeupplz@gmail.com>",
   "license": "MIT",
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "scripts": {
     "distribute": "node dist/app.js",
     "develop": "tsc-watch --skipLibCheck --onSuccess \"node dist/app.js\"",
-    "build": "npm run build-ts",
+    "build": "yarn build-ts",
     "build-ts": "tsc --skipLibCheck",
     "hostinger:install": "node scripts/hostinger-install.js",
     "postinstall": "node scripts/ensure-ytdlp.js",
@@ -30,18 +30,13 @@
     "mongoose": "^6.1.1",
     "mongoose-findorcreate": "^3.0.0",
     "sharp": "^0.33.5",
-    "uuid": "^8.3.2",
     "youtube-dl-exec": "^3.1.7"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.5",
-    "@types/node": "^18.19.0",
-    "@types/sharp": "^0.29.5",
-    "@types/uuid": "^8.3.3",
-    "@typescript-eslint/eslint-plugin": "^5.6.0",
-    "@typescript-eslint/parser": "^5.6.0",
+    "@types/node": "^20.19.0",
     "dotenv": "^10.0.0",
-    "eslint": "^8.4.1",
+    "eslint": "^8.57.1",
     "eslint-config-prettier": "^8.3.0",
     "eslint-plugin-import": "^2.25.3",
     "eslint-plugin-no-relative-import-paths": "^1.0.8",
