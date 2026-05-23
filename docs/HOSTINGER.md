@@ -139,6 +139,20 @@ bash scripts/install-ytdlp.sh
 3. إذا فشل YouTube من السيرفر (حظر Hostinger للخارج)، ستظهر رسالة أوضح في السجلات بعد التحديث.
 4. مؤقتاً للاختبار: `SKIP_YTDLP_PROBE=true` في `.env` (يتخطى الفحص ويحاول التحميل مباشرة).
 
+## خطأ `ffmpeg not found` / `--no-call-home`
+
+- تمت إزالة `--no-call-home` (مهمل في yt-dlp الحديث).
+- بدون ffmpeg: البوت يحمّل **mp4 جاهز** بدون دمج (TikTok/YouTube غالباً يعمل).
+- لتثبيت ffmpeg ثابت في المشروع (~40MB):
+
+```bash
+cd ~/domains/t.nextegypt-agri.com/nodejs
+bash scripts/install-ffmpeg.sh
+bin/ffmpeg -version
+```
+
+ثم أعد نشر التطبيق — سيُكتشف `bin/ffmpeg` تلقائياً.
+
 ## SIGTERM في السجلات
 
 طبيعي عند إعادة نشر Hostinger — البوت يعيد التشغيل. انتظر `bot ready` ثم اختبر الرابط.

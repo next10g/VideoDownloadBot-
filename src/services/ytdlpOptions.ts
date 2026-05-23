@@ -2,6 +2,7 @@ import { existsSync } from 'fs'
 import { resolve } from 'path'
 import { cwd } from 'process'
 import env from '@/helpers/env'
+import { getFfmpegPath } from '@/services/ffmpegPath'
 import type { YtDlpFlags } from '@/services/ytdlpTypes'
 
 const maxFilesize = `${env.MAX_FILE_SIZE_MB}M`
@@ -15,17 +16,33 @@ export function buildProbeFlags(): YtDlpFlags {
 }
 
 export function buildDownloadFlags(outputBase: string, audio: boolean): YtDlpFlags {
-  return {
+  const ffmpeg = getFfmpegPath()
+  const thumbs = !audio && !env.SKIP_THUMBNAILS
+
+  const flags: YtDlpFlags = {
     ...baseFlags(),
     output: `${outputBase}.%(ext)s`,
     writeInfoJson: true,
-    writeThumbnail: !audio && !env.SKIP_THUMBNAILS,
-    convertThumbnails: env.SKIP_THUMBNAILS ? undefined : 'jpg',
-    mergeOutputFormat: 'mp4',
     format: audio
       ? `bestaudio[filesize<=${maxFilesize}]/bestaudio[filesize_approx<=${maxFilesize}]/bestaudio`
-      : `[filesize<=${maxFilesize}][ext=mp4]/[filesize_approx<=${maxFilesize}][ext=mp4]/[filesize<=${maxFilesize}]/[filesize_approx<=${maxFilesize}]`,
+      : `[filesize<=${maxFilesize}][ext=mp4]/[filesize_approx<=${maxFilesize}][ext=mp4]/[filesize<=${maxFilesize}]/[filesize_approx<=${maxFilesize}]/best[filesize<=${maxFilesize}]/best`,
   }
+
+  if (ffmpeg) {
+    flags.ffmpegLocation = ffmpeg
+    if (!audio) {
+      flags.mergeOutputFormat = 'mp4'
+    }
+    if (thumbs) {
+      flags.writeThumbnail = true
+      flags.convertThumbnails = 'jpg'
+    }
+  } else if (thumbs) {
+    // Raw thumbnail only — no ffmpeg conversion
+    flags.writeThumbnail = true
+  }
+
+  return flags
 }
 
 function baseFlags(): YtDlpFlags {
@@ -35,7 +52,6 @@ function baseFlags(): YtDlpFlags {
     noCheckCertificate: true,
     noPlaylist: true,
     maxFilesize,
-    noCallHome: true,
     noProgress: true,
     noCacheDir: true,
     noPart: true,
@@ -47,11 +63,14 @@ function baseFlags(): YtDlpFlags {
     abortOnUnavailableFragment: true,
     hlsPreferNative: true,
     forceIpv4: true,
-    // Shared hosting: avoid Node-based YouTube challenge path when possible
     extractorArgs: 'youtube:player_client=android,web',
   }
   if (existsSync(cookiePath)) {
     flags.cookies = cookiePath
+  }
+  const ffmpeg = getFfmpegPath()
+  if (ffmpeg) {
+    flags.ffmpegLocation = ffmpeg
   }
   return flags
 }

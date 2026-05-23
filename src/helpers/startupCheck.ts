@@ -1,7 +1,5 @@
 import { mkdir, writeFile, rm } from 'fs/promises'
 import { join } from 'path'
-import { execFile } from 'child_process'
-import { promisify } from 'util'
 import mongoose from 'mongoose'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
@@ -10,25 +8,12 @@ import { initYtdlpBinary, isYtdlpRunnable } from '@/services/ytdlpBinary'
 import { runYtdlpJson } from '@/services/ytdlpRunner'
 import { formatYtdlpError } from '@/services/ytdlpSpawn'
 import { buildProbeFlags } from '@/services/ytdlpOptions'
-
-const execFileAsync = promisify(execFile)
+import { resolveFfmpegPath } from '@/services/ffmpegPath'
 
 export interface StartupCheckResult {
   ok: boolean
   errors: string[]
   warnings: string[]
-}
-
-async function commandExists(
-  command: string,
-  args: string[]
-): Promise<boolean> {
-  try {
-    await execFileAsync(command, args, { timeout: 15_000 })
-    return true
-  } catch {
-    return false
-  }
 }
 
 async function checkYtdlpBinary(binaryPath: string): Promise<boolean> {
@@ -109,9 +94,11 @@ export async function runStartupChecks(): Promise<StartupCheckResult> {
     )
   }
 
-  const hasFfmpeg = await commandExists('ffmpeg', ['-version'])
-  if (!hasFfmpeg) {
-    warnings.push('ffmpeg not found on PATH — install ffmpeg for best compatibility')
+  const ffmpegPath = await resolveFfmpegPath()
+  if (!ffmpegPath) {
+    warnings.push(
+      'ffmpeg not found — TikTok/some sites work without it; for merge/HLS run: bash scripts/install-ffmpeg.sh'
+    )
   }
 
   if (env.REQUIRED_CHANNEL_ENABLED && env.REQUIRED_CHANNEL) {

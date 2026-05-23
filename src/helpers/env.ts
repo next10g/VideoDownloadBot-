@@ -54,6 +54,7 @@ const env = cleanEnv(process.env, {
   REQUIRED_CHANNEL: str({ default: '' }),
   REQUIRED_CHANNEL_LINK: str({ default: '' }),
   YTDLP_PATH: str({ default: '' }),
+  FFMPEG_PATH: str({ default: '' }),
   SKIP_YTDLP_PROBE: bool({ default: false }),
   SOFT_YTDLP_PROBE: bool({
     default: true,
@@ -71,6 +72,10 @@ const envApi = {
   },
   get YTDLP_PATH_RESOLVED() {
     const custom = env.YTDLP_PATH.trim()
+    return custom || undefined
+  },
+  get FFMPEG_PATH_RESOLVED() {
+    const custom = env.FFMPEG_PATH.trim()
     return custom || undefined
   },
   get isDevelopment() {

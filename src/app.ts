@@ -25,7 +25,7 @@ import { collectHealthDiagnostics } from '@/helpers/healthDiagnostics'
 import i18n from '@/helpers/i18n'
 import languageMenu from '@/menus/language'
 import report from '@/helpers/report'
-import { runStartupChecks } from '@/helpers/startupCheck'
+import { resolveFfmpegPath } from '@/services/ffmpegPath'
 import startMongo from '@/helpers/startMongo'
 import { startTempMaintenance } from '@/helpers/tempMaintenance'
 import { TEMP_ROOT } from '@/helpers/tempDir'
@@ -61,6 +61,7 @@ async function runApp() {
   await mkdir(TEMP_ROOT, { recursive: true })
   await startMongo()
   logger.info('mongo connected')
+  await resolveFfmpegPath()
   await cleanupDownloadJobs()
   tempMaintenanceTimer = startTempMaintenance()
 
