@@ -1,0 +1,64 @@
+# Language name
+name: English
+# Commands
+help: |
+  😎 Send me a video link, and I'll download it to this chat!
+
+  /help — this message
+  /language — change language
+  /audio — convert all files to audio
+
+  Questions, feedback 👉 @borodutch_support.
+
+  Do you want to support the bot's author? I wrote a scientific book about how to live healthier and happier! You can buy it on Amazon — amazon.com/dp/B0CHL7WRYM or on the book's website — wdlaty.com. Thank you!
+language: 😶 Please, select the language.
+language_selected: 😎 I speak English now.
+audio_on: 📣 I will convert all files to audio-only automatically.
+audio_off: 🎥 I will not convert all files to audio-only automatically.
+# Progress states
+status_validating: 🔍 Checking your link...
+status_queued: 🕐 Added to queue. Your turn is coming up!
+status_queued_wait: 🕐 Queue is busy. Estimated wait ~${minutes} min.
+status_downloading: ⬇️ Downloading video...
+status_uploading: ⬆️ Uploading to Telegram...
+status_sending_cached: ⚡ Found in cache — sending instantly...
+status_completed: ✅ Done! Enjoy your video.
+# Legacy keys (kept for compatibility)
+download_started: ⬇️ Downloading video...
+uploading_started: ⬆️ Uploading to Telegram...
+download_complete: ✅ Done! Enjoy your video.
+# Buttons
+btn_retry: 🔄 Try again
+btn_join_channel: 📢 Join channel
+btn_check_subscription: ✅ I joined — check again
+# Subscription
+subscription_required: |
+  📢 Please join our channel to use this bot.
+
+  Tap **Join channel**, then tap **I joined — check again**.
+subscription_required_short: Please join the channel first.
+subscription_confirmed: ✅ Thanks! You can use the bot now.
+# Caption for completed video
+video_caption: |
+  <b>${title}</b>
+  Downloaded with @${bot} — <a href="https://wdlaty.com">Check out my book</a>
+# Errors
+error_cannot_start_download: 😱 I couldn't start the download. Tap **Try again** or send the link once more.
+error_invalid_url: 🔗 That doesn't look like a valid link. Send a direct video URL.
+error_cache_or_download_job: 😱 Something went wrong while starting. Please try again.
+error_video_download: 😓 Download failed. The source may be unavailable or restricted.
+error_video_upload: 😓 Upload to Telegram failed. Please try again in a minute.
+error_unsupported_url: 🚫 This website isn't supported.
+error_no_suitable_video_size: 📦 No suitable file under the size limit was found.
+error_reboot: 🔄 Server restarted during your download. Please send the link again.
+error_cooldown: ⏳ Please wait ${seconds}s before sending another link.
+error_duplicate_url: ⏳ You already have this link in progress.
+error_user_job_limit: ⏳ Please wait until your current download finishes.
+error_livestream: 📡 Live streams are not supported.
+error_playlist: 📋 Playlists aren't supported. Send a single video link.
+error_duration_too_long: ⏱ This video is too long for this server.
+error_blacklisted_domain: 🚫 This domain is not allowed.
+error_user_blocked: 🚫 Too many failed attempts. Try again in ${minutes} min.
+error_suspicious_source: 🚫 This source is temporarily restricted.
+error_retry_spam: ⏳ Too many retries. Please wait a moment.
+error_retry_no_url: 🔗 Send the video link again to retry.

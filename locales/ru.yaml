@@ -1,0 +1,59 @@
+# Language name
+name: Русский
+# Commands
+help: |
+  😎 Отправьте мне ссылку на видео, и я загружу его в этот чат!
+
+  /help — это сообщение
+  /language — выбрать язык
+  /audio — преобразовывать все файлы в аудио
+
+  Вопросы, обратная связь 👉 @borodutch_support.
+
+  Хотите поддержать автора бота? Я написал научную книгу о том, как жить здоровее и счастливее! Купить ее можно на Амазоне — amazon.com/dp/B0CHL7WRYM или на сайте книги — wdlaty.com. Спасибо!
+language: 😶 Пожалуйста, выберите язык.
+language_selected: 😎 Теперь я говорю по-русски.
+audio_on: 📣 Я буду преобразовывать все файлы в аудио автоматически.
+audio_off: 🎥 Я не буду преобразовывать все файлы в аудио автоматически.
+# Progress states
+status_validating: 🔍 Проверяю ссылку...
+status_queued: 🕐 Добавлено в очередь. Скоро начну!
+status_queued_wait: 🕐 Очередь занята. Примерное ожидание ~${minutes} мин.
+status_downloading: ⬇️ Скачиваю видео...
+status_uploading: ⬆️ Загружаю в Telegram...
+status_sending_cached: ⚡ Нашёл в кеше — отправляю...
+status_completed: ✅ Готово! Приятного просмотра.
+download_started: ⬇️ Скачиваю видео...
+uploading_started: ⬆️ Загружаю в Telegram...
+download_complete: ✅ Готово! Приятного просмотра.
+btn_retry: 🔄 Повторить
+btn_join_channel: 📢 Подписаться
+btn_check_subscription: ✅ Я подписался — проверить
+subscription_required: |
+  📢 Подпишитесь на наш канал, чтобы пользоваться ботом.
+
+  Нажмите **Подписаться**, затем **Я подписался — проверить**.
+subscription_required_short: Сначала подпишитесь на канал.
+subscription_confirmed: ✅ Спасибо! Можете пользоваться ботом.
+video_caption: |
+  <b>${title}</b>
+  Загружено через @${bot} — <a href="https://wdlaty.com">Читайте мою книгу</a>
+error_cannot_start_download: 😱 Не удалось начать загрузку. Нажмите **Повторить** или отправьте ссылку снова.
+error_invalid_url: 🔗 Это не похоже на ссылку. Отправьте URL видео.
+error_cache_or_download_job: 😱 Что-то пошло не так при запуске. Попробуйте ещё раз.
+error_video_download: 😓 Не удалось скачать. Источник может быть недоступен.
+error_video_upload: 😓 Не удалось загрузить в Telegram. Попробуйте через минуту.
+error_unsupported_url: 🚫 Этот сайт не поддерживается.
+error_no_suitable_video_size: 📦 Нет подходящего файла в пределах лимита размера.
+error_reboot: 🔄 Сервер перезагрузился. Отправьте ссылку снова.
+error_cooldown: ⏳ Подождите ${seconds} сек. перед следующей ссылкой.
+error_duplicate_url: ⏳ Эта ссылка уже обрабатывается.
+error_user_job_limit: ⏳ Дождитесь завершения текущей загрузки.
+error_livestream: 📡 Прямые трансляции не поддерживаются.
+error_playlist: 📋 Плейлисты не поддерживаются. Отправьте одну ссылку.
+error_duration_too_long: ⏱ Видео слишком длинное для этого сервера.
+error_blacklisted_domain: 🚫 Этот домен запрещён.
+error_user_blocked: 🚫 Слишком много ошибок. Попробуйте через ${minutes} мин.
+error_suspicious_source: 🚫 Источник временно ограничен.
+error_retry_spam: ⏳ Слишком много повторов. Подождите немного.
+error_retry_no_url: 🔗 Отправьте ссылку снова для повтора.
