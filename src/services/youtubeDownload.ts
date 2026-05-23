@@ -2,8 +2,8 @@ import { readdir } from 'fs/promises'
 import { basename, dirname } from 'path'
 import logger from '@/lib/logger'
 import env from '@/helpers/env'
-import { downloadInvidiousYoutube } from '@/services/invidiousYoutube'
-import { downloadPipedYoutube } from '@/services/pipedYoutube'
+import { downloadInvidiousYoutube, invidiousApiBases } from '@/services/invidiousYoutube'
+import { downloadPipedYoutube, pipedApiBases } from '@/services/pipedYoutube'
 import {
   useProxyYoutubeApis,
   useYtdlpForYoutube,
@@ -176,8 +176,9 @@ export function logYoutubePublicMode(): void {
         : mode === 'auto'
           ? 'invidious → piped → yt-dlp'
           : 'invidious → piped',
-    pipedApis: env.PIPED_API_URLS.length || 'built-in list',
-    invidiousApis: env.INVIDIOUS_API_URLS.length || 'built-in list',
+    pipedApis: pipedApiBases().length,
+    invidiousApis: invidiousApiBases().length,
+    invidiousCustom: env.INVIDIOUS_API_URLS.length,
     cookiePoolSize: cookiePoolSize(),
     userCooldownSec: env.YOUTUBE_USER_COOLDOWN_SECONDS,
   })

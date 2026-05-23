@@ -26,6 +26,7 @@ import i18n from '@/helpers/i18n'
 import languageMenu from '@/menus/language'
 import report from '@/helpers/report'
 import { resolveFfmpegPath } from '@/services/ffmpegPath'
+import { initYoutubeFetchAgent } from '@/services/youtubeFetchInit'
 import { logYoutubePublicMode } from '@/services/youtubeDownload'
 import { initYtdlpOptions } from '@/services/ytdlpOptions'
 import startMongo from '@/helpers/startMongo'
@@ -65,6 +66,7 @@ async function runApp() {
   logger.info('mongo connected')
   await resolveFfmpegPath()
   await initYtdlpOptions()
+  initYoutubeFetchAgent()
   logYoutubePublicMode()
   await cleanupDownloadJobs()
   tempMaintenanceTimer = startTempMaintenance()

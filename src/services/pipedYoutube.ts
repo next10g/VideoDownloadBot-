@@ -1,5 +1,6 @@
 import { writeFile } from 'fs/promises'
 import env from '@/helpers/env'
+import { mergeApiBases } from '@/helpers/normalizeApiUrl'
 import { extractYoutubeVideoId } from '@/helpers/youtubeVideoId'
 import { ValidationError } from '@/lib/errors'
 import logger from '@/lib/logger'
@@ -42,8 +43,8 @@ const DEFAULT_PIPED_APIS = [
   'https://pipedapi.kavin.rocks',
 ]
 
-function pipedApiBases(): string[] {
-  return env.PIPED_API_URLS.length > 0 ? env.PIPED_API_URLS : DEFAULT_PIPED_APIS
+export function pipedApiBases(): string[] {
+  return mergeApiBases(env.PIPED_API_URLS, DEFAULT_PIPED_APIS)
 }
 
 function streamSize(item: PipedStreamItem): number {
