@@ -61,9 +61,25 @@ const env = cleanEnv(process.env, {
   REQUIRED_CHANNEL_LINK: str({ default: '' }),
   YTDLP_PATH: str({ default: '' }),
   FFMPEG_PATH: str({ default: '' }),
+  YOUTUBE_USE_COOKIES: bool({
+    default: false,
+    desc: 'Public bot: keep false. Optional admin cookies/pool as fallback only',
+  }),
+  YOUTUBE_COOKIE_POOL_DIR: str({
+    default: '',
+    desc: 'Directory of cookies-pool/*.txt when YOUTUBE_USE_COOKIES=true (rotates per job)',
+  }),
+  YOUTUBE_USER_COOLDOWN_SECONDS: num({
+    default: 20,
+    desc: 'Per-user wait between YouTube links (reduces IP blocks on shared hosting)',
+  }),
+  YTDLP_YOUTUBE_PO_TOKEN: str({
+    default: '',
+    desc: 'Optional PO token(s), e.g. android_vr.gvs+TOKEN (see yt-dlp PO Token Guide)',
+  }),
   COOKIES_PATH: str({
     default: '',
-    desc: 'Netscape cookies.txt for YouTube (or place file named "cookie" in project root)',
+    desc: 'Single cookies file when YOUTUBE_USE_COOKIES=true',
   }),
   YTDLP_NODE_PATH: str({
     default: '',
@@ -95,6 +111,13 @@ const envApi = {
   get COOKIES_PATH_RESOLVED() {
     const custom = env.COOKIES_PATH.trim()
     return custom || undefined
+  },
+  get YOUTUBE_COOKIE_POOL_DIR_RESOLVED() {
+    const custom = env.YOUTUBE_COOKIE_POOL_DIR.trim()
+    return custom || undefined
+  },
+  get YOUTUBE_USER_COOLDOWN_MS() {
+    return env.YOUTUBE_USER_COOLDOWN_SECONDS * 1000
   },
   get YTDLP_NODE_PATH_RESOLVED() {
     const custom = env.YTDLP_NODE_PATH.trim()

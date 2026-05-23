@@ -1,6 +1,6 @@
 import env from '@/helpers/env'
 import { getFfmpegPath } from '@/services/ffmpegPath'
-import { resolveCookiesPath } from '@/services/ytdlpCookies'
+import { resolveCookiePool, shouldUseYoutubeCookies } from '@/services/ytdlpCookies'
 import { getYtdlpJsRuntimesFlag, resolveNodeForYtdlp } from '@/services/ytdlpNodeRuntime'
 import type { YtDlpFlags } from '@/services/ytdlpTypes'
 
@@ -14,20 +14,27 @@ const progressiveVideoFormat = [
   'best',
 ].join('/')
 
-let cachedCookiesPath: string | undefined
-let cookiesResolved = false
-
-async function ensureCookiesPath(): Promise<void> {
-  if (!cookiesResolved) {
-    cachedCookiesPath = await resolveCookiesPath()
-    cookiesResolved = true
-  }
+export interface DownloadFlagOverrides {
+  extractorArgs?: string
+  cookiesPath?: string
 }
 
-/** Call at startup so downloads include cookies + Node JS runtime when available. */
+let cookiesPoolReady = false
+
+/** Public bot default: no cookies. Optional pool only if YOUTUBE_USE_COOKIES=true. */
+function defaultYoutubeExtractorArgs(): string {
+  const po = env.YTDLP_YOUTUBE_PO_TOKEN.trim()
+  const poSuffix = po ? `;po_token=${po}` : ''
+  return `youtube:player_client=android_vr,web_embedded,ios,android,tv;player_skip=webpage,configs${poSuffix}`
+}
+
+/** Call at startup — Node runtime + optional cookie pool for admin mode. */
 export async function initYtdlpOptions(): Promise<void> {
   await resolveNodeForYtdlp()
-  await ensureCookiesPath()
+  if (shouldUseYoutubeCookies()) {
+    await resolveCookiePool()
+  }
+  cookiesPoolReady = true
 }
 
 export function buildProbeFlags(): YtDlpFlags {
@@ -38,12 +45,16 @@ export function buildProbeFlags(): YtDlpFlags {
   }
 }
 
-export function buildDownloadFlags(outputBase: string, audio: boolean): YtDlpFlags {
+export function buildDownloadFlags(
+  outputBase: string,
+  audio: boolean,
+  overrides?: DownloadFlagOverrides
+): YtDlpFlags {
   const ffmpeg = getFfmpegPath()
   const thumbs = !audio && !env.SKIP_THUMBNAILS
 
   const flags: YtDlpFlags = {
-    ...baseFlags(),
+    ...baseFlags(overrides),
     quiet: true,
     output: `${outputBase}.%(ext)s`,
     writeInfoJson: true,
@@ -69,17 +80,7 @@ export function buildDownloadFlags(outputBase: string, audio: boolean): YtDlpFla
   return flags
 }
 
-function youtubeExtractorArgs(): string {
-  if (cachedCookiesPath && getYtdlpJsRuntimesFlag()) {
-    return 'youtube:player_client=tv,mweb,web'
-  }
-  if (cachedCookiesPath) {
-    return 'youtube:player_client=tv,mweb,web,android'
-  }
-  return 'youtube:player_client=android,ios,tv,web;player_skip=webpage,configs'
-}
-
-function baseFlags(): YtDlpFlags {
+function baseFlags(overrides?: DownloadFlagOverrides): YtDlpFlags {
   const flags: YtDlpFlags = {
     noWarnings: true,
     noCheckCertificate: true,
@@ -96,18 +97,23 @@ function baseFlags(): YtDlpFlags {
     abortOnUnavailableFragment: true,
     hlsPreferNative: true,
     forceIpv4: true,
-    extractorArgs: youtubeExtractorArgs(),
+    extractorArgs: overrides?.extractorArgs ?? defaultYoutubeExtractorArgs(),
   }
   const jsRuntimes = getYtdlpJsRuntimesFlag()
   if (jsRuntimes) {
     flags.jsRuntimes = jsRuntimes
   }
-  if (cachedCookiesPath) {
-    flags.cookies = cachedCookiesPath
+  const cookiesPath = overrides?.cookiesPath
+  if (cookiesPath) {
+    flags.cookies = cookiesPath
   }
   const ffmpeg = getFfmpegPath()
   if (ffmpeg) {
     flags.ffmpegLocation = ffmpeg
   }
   return flags
+}
+
+export function isYtdlpOptionsReady(): boolean {
+  return cookiesPoolReady
 }

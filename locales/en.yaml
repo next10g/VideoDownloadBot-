@@ -60,11 +60,14 @@ error_user_blocked: 🚫 Too many failed attempts. Try again in ${minutes} min.
 error_suspicious_source: 🚫 This source is temporarily restricted.
 error_retry_spam: ⏳ Too many retries. Wait a moment.
 error_retry_no_url: 🔗 Send the video link again to retry.
+error_youtube_cooldown: ⏳ YouTube — wait ${seconds}s before another link (public bot, fair use).
 error_youtube_bot: |
-  ▶️ YouTube blocked the server (login required).
+  ▶️ YouTube is temporarily unavailable from this server.
 
-  Upload a <code>cookie</code> file to the bot folder (YouTube cookies from your browser).
-  Contact @Dev_Nour_M if you need help.
+  Try again later, or use TikTok / Instagram / another site.
+  This is a <b>public</b> bot — it does not use your personal login or cookies.
+
+  Contact @Dev_Nour_M if it keeps failing.
 error_private_bot: |
   🔒 This bot is <b>private</b> for Nour Mohamed only (@Dev_Nour_M).
 

@@ -1,4 +1,6 @@
-# YouTube على Hostinger — cookies + Node.js
+# YouTube — cookies (اختياري للمسؤول فقط)
+
+> **بوت عام؟** اقرأ [YOUTUBE-PUBLIC-BOT.md](./YOUTUBE-PUBLIC-BOT.md) — الافتراضي `YOUTUBE_USE_COOKIES=false` ومفيش اعتماد على كوكيز المستخدمين.
 
 ## لماذا YouTube يفشل؟
 

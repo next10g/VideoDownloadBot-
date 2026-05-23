@@ -16,7 +16,9 @@ import sendCompletedFile from '@/helpers/sendCompletedFile'
 import { createJobTempDir, removePathSafe } from '@/helpers/tempDir'
 import withTimeout from '@/helpers/withTimeout'
 import logger from '@/lib/logger'
+import { isYoutubeUrl } from '@/helpers/youtubeUrl'
 import { buildDownloadFlags } from '@/services/ytdlpOptions'
+import { runYoutubeDownload } from '@/services/youtubeDownload'
 import { runYtdlpDownload } from '@/services/ytdlpRunner'
 import type { YtDlpMetadata } from '@/services/ytdlpTypes'
 import {
@@ -117,15 +119,23 @@ export default async function downloadUrl(
   try {
     jobDir = await createJobTempDir(fileBase)
     const outputBase = join(jobDir, 'video')
-    const options = buildDownloadFlags(outputBase, downloadJob.audio)
+    const jobId = String(downloadJob.id)
 
-    logger.info('download start', { url: downloadJob.url, jobId: downloadJob.id, jobDir })
-    const ytdlpResult = await runYtdlpDownload(
-      downloadJob.url,
-      options,
-      env.DOWNLOAD_TIMEOUT_MS,
-      'download'
-    )
+    logger.info('download start', { url: downloadJob.url, jobId, jobDir })
+    const ytdlpResult = isYoutubeUrl(downloadJob.url)
+      ? await runYoutubeDownload(
+          downloadJob.url,
+          outputBase,
+          downloadJob.audio,
+          jobId,
+          env.DOWNLOAD_TIMEOUT_MS
+        )
+      : await runYtdlpDownload(
+          downloadJob.url,
+          buildDownloadFlags(outputBase, downloadJob.audio),
+          env.DOWNLOAD_TIMEOUT_MS,
+          'download'
+        )
 
     const entries = await readdir(jobDir)
     logger.info('download dir after yt-dlp', {

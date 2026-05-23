@@ -24,6 +24,12 @@ import { assertUserJobLimits } from '@/services/jobGuards'
 import { probeUrlMetadata } from '@/services/ytdlpProbe'
 import { preflightUrl } from '@/services/urlPreflight'
 import { normalizeUrl } from '@/services/urlNormalize'
+import { isYoutubeUrl } from '@/helpers/youtubeUrl'
+import {
+  isOnYoutubeCooldown,
+  touchYoutubeCooldown,
+  youtubeCooldownRemainingSeconds,
+} from '@/helpers/youtubeCooldown'
 import { recordDownloadFailure } from '@/helpers/userAbuse'
 
 export default async function createDownloadJobAndRequest(
@@ -38,6 +44,13 @@ export default async function createDownloadJobAndRequest(
     const seconds = cooldownRemainingSeconds(ctx.dbchat.telegramId)
     return ctx.reply(
       ctx.i18n.t('error_cooldown', { seconds: String(seconds) })
+    )
+  }
+
+  if (isYoutubeUrl(url) && isOnYoutubeCooldown(ctx.dbchat.telegramId)) {
+    const seconds = youtubeCooldownRemainingSeconds(ctx.dbchat.telegramId)
+    return ctx.reply(
+      ctx.i18n.t('error_youtube_cooldown', { seconds: String(seconds) })
     )
   }
 
@@ -56,11 +69,7 @@ export default async function createDownloadJobAndRequest(
       try {
         await probeUrlMetadata(checkedUrl)
       } catch (probeError) {
-        if (
-          env.SOFT_YTDLP_PROBE &&
-          isValidationError(probeError) &&
-          probeError.code !== 'youtube_bot'
-        ) {
+        if (env.SOFT_YTDLP_PROBE && isValidationError(probeError)) {
           logger.warn('soft probe: continuing to download', {
             url: checkedUrl,
             code: probeError.code,
@@ -80,6 +89,9 @@ export default async function createDownloadJobAndRequest(
       )
       if (cached) {
         touchCooldown(ctx.dbchat.telegramId)
+        if (isYoutubeUrl(checkedUrl)) {
+          touchYoutubeCooldown(ctx.dbchat.telegramId)
+        }
         return
       }
     } catch (error) {
@@ -87,6 +99,9 @@ export default async function createDownloadJobAndRequest(
     }
 
     touchCooldown(ctx.dbchat.telegramId)
+    if (isYoutubeUrl(checkedUrl)) {
+      touchYoutubeCooldown(ctx.dbchat.telegramId)
+    }
 
     const waitSec = downloadQueue.getEstimatedWaitSeconds()
     if (waitSec > env.AVG_JOB_DURATION_SECONDS) {

@@ -103,12 +103,16 @@ node dist/app.js
 
 ---
 
-## `.env` موصى به
+## `.env` موصى به (بوت عام)
 
 ```env
-MAX_FILE_SIZE_MB=200
+YOUTUBE_USE_COOKIES=false
+YOUTUBE_USER_COOLDOWN_SECONDS=20
+YTDLP_NODE_PATH=/opt/alt/alt-nodejs22/root/usr/bin/node
+MAX_FILE_SIZE_MB=50
 SKIP_THUMBNAILS=true
 NODE_OPTIONS=--max-old-space-size=384
+# يوتيوب بدون كوكيز المستخدمين — راجع docs/YOUTUBE-PUBLIC-BOT.md
 # لا تضبط YTDLP_PATH=/tmp/yt-dlp — /tmp غالباً noexec ويسبب EACCES
 # اتركه فارغاً أو استخدم المسار الكامل لـ bin/yt-dlp داخل التطبيق
 ```

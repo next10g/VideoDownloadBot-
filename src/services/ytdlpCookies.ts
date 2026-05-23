@@ -1,10 +1,16 @@
-import { readFile, stat } from 'fs/promises'
+import { readdir, readFile, stat } from 'fs/promises'
 import { join, resolve } from 'path'
 import { cwd } from 'process'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
 
 let loggedPath: string | undefined
+let cookiePool: string[] | undefined
+let poolResolved = false
+
+export function shouldUseYoutubeCookies(): boolean {
+  return env.YOUTUBE_USE_COOKIES
+}
 
 export function isYoutubeBotBlock(message: string): boolean {
   const m = message.toLowerCase()
@@ -12,6 +18,7 @@ export function isYoutubeBotBlock(message: string): boolean {
     m.includes('sign in to confirm') ||
     m.includes("you're not a bot") ||
     m.includes('not a bot') ||
+    m.includes('login_required') ||
     m.includes('cookies-from-browser')
   )
 }
@@ -41,12 +48,12 @@ async function inspectCookiesFile(filePath: string): Promise<void> {
     const hasSession = /LOGIN_INFO|SAPISID|SID\t|__Secure-1PSID/i.test(sample)
     if (ytDlpExportHeader && !hasSession) {
       logger.warn(
-        'cookies.txt was exported by yt-dlp itself — YouTube needs cookies from your BROWSER while logged in. See docs/YOUTUBE-COOKIES.md'
+        'cookies.txt was exported by yt-dlp itself — re-export from browser. See docs/YOUTUBE-COOKIES.md'
       )
     }
     if (!hasSession) {
       logger.warn(
-        'cookies.txt may be incomplete (no LOGIN_INFO/SAPISID) — re-export from Chrome extension Get cookies.txt LOCALLY'
+        'cookies.txt may be incomplete (no LOGIN_INFO/SAPISID) — re-export from Chrome'
       )
     }
   } catch {
@@ -66,7 +73,6 @@ async function tryPath(filePath: string): Promise<string | undefined> {
   return filePath
 }
 
-/** If user created a folder named `cookie/`, look for cookies.txt inside. */
 async function tryCookieDirectory(dirPath: string): Promise<string | undefined> {
   try {
     const info = await stat(dirPath)
@@ -86,16 +92,71 @@ async function tryCookieDirectory(dirPath: string): Promise<string | undefined> 
     const inner = join(dirPath, name)
     const found = await tryPath(inner)
     if (found) {
-      logger.warn('cookies found inside cookie/ folder — prefer a single file at ./cookies.txt', {
-        using: found,
-      })
       return found
     }
   }
-  logger.error('cookie is a directory, not a file — upload cookies.txt into project root', {
+  logger.error('cookie is a directory, not a file — use cookies-pool/ or cookies.txt', {
     path: dirPath,
   })
   return undefined
+}
+
+async function listCookiePoolDir(dirPath: string): Promise<string[]> {
+  try {
+    const info = await stat(dirPath)
+    if (!info.isDirectory()) {
+      return []
+    }
+    const names = await readdir(dirPath)
+    const files: string[] = []
+    for (const name of names.sort()) {
+      if (!name.endsWith('.txt')) {
+        continue
+      }
+      const full = join(dirPath, name)
+      if (await isCookiesFile(full)) {
+        files.push(full)
+      }
+    }
+    return files
+  } catch {
+    return []
+  }
+}
+
+/** Load optional admin cookie pool (only when YOUTUBE_USE_COOKIES=true). */
+export async function resolveCookiePool(): Promise<string[]> {
+  if (!shouldUseYoutubeCookies()) {
+    return []
+  }
+  if (poolResolved) {
+    return cookiePool ?? []
+  }
+  poolResolved = true
+  const root = cwd()
+  const poolDir = env.YOUTUBE_COOKIE_POOL_DIR_RESOLVED ?? resolve(root, 'cookies-pool')
+  const fromPool = await listCookiePoolDir(poolDir)
+  if (fromPool.length > 0) {
+    cookiePool = fromPool
+    logger.info('YouTube cookie pool', { count: fromPool.length, dir: poolDir })
+    return fromPool
+  }
+
+  const single = await resolveCookiesPath()
+  cookiePool = single ? [single] : []
+  if (cookiePool.length === 0) {
+    logger.warn('YOUTUBE_USE_COOKIES=true but no cookies.txt or cookies-pool/*.txt found')
+  }
+  return cookiePool
+}
+
+export function pickCookieForJob(jobId: string): string | undefined {
+  const pool = cookiePool
+  if (!pool?.length) {
+    return undefined
+  }
+  const idx = parseInt(jobId.slice(-8), 16) % pool.length
+  return pool[idx]
 }
 
 export async function resolveCookiesPath(): Promise<string | undefined> {
