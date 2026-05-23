@@ -46,12 +46,27 @@ chmod 600 cookies.txt
 grep -E 'LOGIN_INFO|SAPISID|PSID' cookies.txt | head
 ```
 
-6. اختبر:
+6. اختبر (SSH — `node` غالباً مش في PATH):
 
 ```bash
-./bin/yt-dlp --cookies ./cookies.txt --js-runtimes "node:$(which node 2>/dev/null || echo /opt/alt/alt-nodejs20/root/usr/bin/node)" -f "best[ext=mp4]" -o test.mp4 "https://www.youtube.com/watch?v=zSH15dIl7D0"
+cd ~/domains/t.nextegypt-agri.com/nodejs
+chmod +x bin/yt-dlp
+bash scripts/test-youtube.sh
+```
+
+أو يدوياً:
+
+```bash
+chmod +x bin/yt-dlp
+NODE=/opt/alt/alt-nodejs20/root/usr/bin/node
+$NODE --version
+./bin/yt-dlp --cookies ./cookies.txt --js-runtimes "node:$NODE" \
+  -f "best[ext=mp4]/best" -o test.mp4 \
+  "https://www.youtube.com/watch?v=zSH15dIl7D0"
 ls -lh test.mp4
 ```
+
+لو `Permission denied` على `bin/yt-dlp` → نفّذ `chmod +x bin/yt-dlp` أولاً.
 
 لو `test.mp4` اتعمل → البوت هيشتغل بعد إعادة النشر.
 

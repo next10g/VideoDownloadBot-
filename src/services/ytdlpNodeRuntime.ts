@@ -15,6 +15,7 @@ function nodeCandidates(): string[] {
   return [
     env.YTDLP_NODE_PATH_RESOLVED,
     execPath,
+    '/opt/alt/alt-nodejs22/root/usr/bin/node',
     '/opt/alt/alt-nodejs20/root/usr/bin/node',
     '/opt/alt/alt-nodejs18/root/usr/bin/node',
     'node',

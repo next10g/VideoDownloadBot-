@@ -200,6 +200,11 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 exec "${py.replace(/"/g, '\\"')}" "$DIR/yt-dlp.py" "$@"
 `
   fs.writeFileSync(wrapper, content, { mode: 0o755 })
+  try {
+    fs.chmodSync(wrapper, 0o755)
+  } catch {
+    // ignore
+  }
   if (!canExecute(wrapper)) {
     throw new Error(`Wrapper failed: ${wrapper}`)
   }
