@@ -64,13 +64,32 @@ node dist/app.js
 MAX_FILE_SIZE_MB=200
 SKIP_THUMBNAILS=true
 NODE_OPTIONS=--max-old-space-size=384
-YTDLP_PATH=/tmp/yt-dlp
+# اختياري — الافتراضي bin/yt-dlp داخل المشروع (أفضل من /tmp على shared hosting)
+# YTDLP_PATH=/home/.../bin/yt-dlp
 ```
+
+## خطأ `EACCES` أثناء `postinstall` / `ensure-ytdlp`
+
+على بعض الاستضافات `/tmp` **لا يسمح بتشغيل** الملفات (`noexec`). الحل في الكود الحالي:
+
+1. يُحمَّل `yt-dlp` إلى **`bin/yt-dlp`** داخل مجلد التطبيق (قابل للتنفيذ عادةً).
+2. `postinstall` **لا يوقف** `npm install` حتى لو فشل الفحص.
+3. عند التشغيل يحاول البوت `chmod` ثم يستخدم أول مسار يعمل.
+
+بعد النشر على SSH:
+
+```bash
+node scripts/ensure-ytdlp.js
+chmod +x bin/yt-dlp
+bin/yt-dlp --version
+```
+
+إذا لزم: `YTDLP_PATH=/full/path/to/your/app/bin/yt-dlp` في متغيرات Hostinger.
 
 ## خطأ `yt-dlp probe failed` مع `message` فارغ
 
 1. تأكد أن `node scripts/ensure-ytdlp.js` نجح عند التثبيت.
-2. على SSH جرّب: `/tmp/yt-dlp --version`
+2. على SSH جرّب: `bin/yt-dlp --version` (أو المسار في `YTDLP_PATH`)
 3. إذا فشل YouTube من السيرفر (حظر Hostinger للخارج)، ستظهر رسالة أوضح في السجلات بعد التحديث.
 4. مؤقتاً للاختبار: `SKIP_YTDLP_PROBE=true` في `.env` (يتخطى الفحص ويحاول التحميل مباشرة).
 

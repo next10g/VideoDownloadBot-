@@ -1,11 +1,14 @@
-import { access } from 'fs/promises'
+import { access, chmod } from 'fs/promises'
 import { constants as fsConstants } from 'fs'
 import { join } from 'path'
+import { cwd } from 'process'
 import { tmpdir } from 'os'
 import env from '@/helpers/env'
+import logger from '@/lib/logger'
 
 const CANDIDATE_PATHS = [
   () => env.YTDLP_PATH_RESOLVED,
+  () => join(cwd(), 'bin', 'yt-dlp'),
   () => join(tmpdir(), 'yt-dlp'),
   () => '/tmp/yt-dlp',
   () => {
@@ -21,6 +24,26 @@ const CANDIDATE_PATHS = [
 
 let cachedPath: string | undefined
 
+async function tryChmodExecutable(filePath: string): Promise<void> {
+  try {
+    await chmod(filePath, 0o755)
+  } catch (error) {
+    logger.warn('yt-dlp chmod failed', {
+      path: filePath,
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
+}
+
+async function canAccess(filePath: string): Promise<boolean> {
+  try {
+    await access(filePath, fsConstants.F_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export async function resolveYtdlpPath(): Promise<string> {
   if (cachedPath) {
     return cachedPath
@@ -30,16 +53,14 @@ export async function resolveYtdlpPath(): Promise<string> {
     if (!candidate) {
       continue
     }
-    try {
-      await access(candidate, fsConstants.F_OK)
+    if (await canAccess(candidate)) {
+      await tryChmodExecutable(candidate)
       cachedPath = candidate
       return candidate
-    } catch {
-      // try next
     }
   }
   throw new Error(
-    'yt-dlp binary not found. Run node scripts/ensure-ytdlp.js or set YTDLP_PATH in .env'
+    'yt-dlp binary not found. Run: node scripts/ensure-ytdlp.js — prefer bin/yt-dlp in project folder'
   )
 }
 
@@ -48,14 +69,7 @@ export function getCachedYtdlpPath(): string | undefined {
 }
 
 export async function initYtdlpBinary(): Promise<string> {
-  const path = await resolveYtdlpPath()
-  if (!env.isDevelopment) {
-    const { chmod } = await import('fs/promises')
-    try {
-      await chmod(path, 0o755)
-    } catch {
-      // ignore
-    }
-  }
-  return path
+  const filePath = await resolveYtdlpPath()
+  logger.info('yt-dlp binary', { path: filePath })
+  return filePath
 }
