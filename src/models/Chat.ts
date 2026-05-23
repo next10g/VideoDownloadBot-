@@ -12,7 +12,7 @@ import {
 export class Chat extends FindOrCreate {
   @prop({ required: true, index: true, unique: true })
   telegramId!: number
-  @prop({ required: true, default: 'en' })
+  @prop({ required: true, default: 'ar' })
   language!: string
   @prop({ required: true, default: false })
   audio!: boolean

@@ -1,0 +1,68 @@
+# اللغة
+name: العربية (مصر)
+# الأوامر
+help: |
+  😎 ابعتلي لينك الفيديو وأنا هنزّلهولك في الشات!
+
+  /help — الرسالة دي
+  /language — تغيير اللغة
+  /audio — تحويل التحميلات لصوت بس
+
+  المطور: <b>Nour Mohamed</b> — @Dev_Nour_M
+
+  لو في مشكلة ابعتلي على @Dev_Nour_M
+language: 😶 اختار اللغة اللي تحبها.
+language_selected: 😎 تمام، هتكلم مصري من دلوقتي.
+audio_on: 📣 هحوّل أي لينك لملف صوت بس أوتوماتيك.
+audio_off: 🎥 هفضل أنزّل فيديو عادي مش صوت بس.
+# حالات التحميل
+status_validating: 🔍 بفحص اللينك...
+status_queued: 🕐 اتضافت في الطابور، دورك جاي!
+status_queued_wait: 🕐 الطابور زحمة، الانتظار تقريباً ~${minutes} دقيقة.
+status_downloading: ⬇️ بنزّل الفيديو...
+status_uploading: ⬆️ بترفع على تيليجرام...
+status_sending_cached: ⚡ لقيناه في الكاش — ببعتلك على طول...
+status_completed: ✅ خلص! بالهناء والشفاء.
+# توافق قديم
+download_started: ⬇️ بنزّل الفيديو...
+uploading_started: ⬆️ بترفع على تيليجرام...
+download_complete: ✅ خلص! بالهناء والشفاء.
+# أزرار
+btn_retry: 🔄 جرّب تاني
+btn_join_channel: 📢 انضم للقناة
+btn_check_subscription: ✅ انضميت — اتأكد تاني
+# اشتراك إجباري (لو مفعّل)
+subscription_required: |
+  📢 لازم تنضم للقناة الأول عشان تستخدم البوت.
+
+  دوس **انضم للقناة**، وبعدين **انضميت — اتأكد تاني**.
+subscription_required_short: انضم للقناة الأول لو سمحت.
+subscription_confirmed: ✅ تمام! تقدر تستخدم البوت دلوقتي.
+# وصف الفيديو بعد التحميل
+video_caption: |
+  <b>${title}</b>
+  اتنزّل بـ @${bot} — مطور البوت: <a href="https://t.me/Dev_Nour_M">Nour Mohamed</a>
+# أخطاء
+error_cannot_start_download: 😱 معرفتش أبدأ التحميل. دوس **جرّب تاني** أو ابعت اللينك مرة تانية.
+error_invalid_url: 🔗 اللينك مش مظبوط. ابعت لينك فيديو مباشر.
+error_cache_or_download_job: 😱 حصلت مشكلة وأنا بابدأ. جرّب تاني.
+error_video_download: 😓 التحميل فشل. يمكن المصدر مقفول أو مش متاح.
+error_video_upload: 😓 الرفع على تيليجرام فشل. جرّب بعد شوية.
+error_unsupported_url: 🚫 الموقع ده مش مدعوم.
+error_no_suitable_video_size: 📦 مفيش ملف مناسب تحت حد الحجم.
+error_reboot: 🔄 السيرفر اتعمله ريستارت وأنت بتنزل. ابعت اللينك تاني.
+error_cooldown: ⏳ استنى ${seconds} ثانية قبل ما تبعت لينك تاني.
+error_duplicate_url: ⏳ اللينك ده شغال عليه دلوقتي.
+error_user_job_limit: ⏳ استنى لحد ما التحميل الحالي يخلص.
+error_livestream: 📡 البث المباشر مش مدعوم.
+error_playlist: 📋 قوايم التشغيل مش مدعومة. ابعت لينك فيديو واحد.
+error_duration_too_long: ⏱ الفيديو طويل أوي على السيرفر ده.
+error_blacklisted_domain: 🚫 الدومين ده ممنوع.
+error_user_blocked: 🚫 محاولات فاشلة كتير. جرّب بعد ${minutes} دقيقة.
+error_suspicious_source: 🚫 المصدر ده متوقف مؤقتاً.
+error_retry_spam: ⏳ محاولات كتير. استنى شوية.
+error_retry_no_url: 🔗 ابعت لينك الفيديو تاني عشان نجرّب.
+error_private_bot: |
+  🔒 البوت ده <b>خاص</b> بـ Nour Mohamed بس (@Dev_Nour_M).
+
+  مش متاح لغيره.

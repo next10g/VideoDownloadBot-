@@ -7,6 +7,7 @@ import { mkdir } from 'fs/promises'
 import { webhookCallback } from 'grammy'
 import { ignoreOld } from 'grammy-middlewares'
 import attachUser from '@/middlewares/attachUser'
+import allowedUserOnly from '@/middlewares/allowedUserOnly'
 import requiredSubscription from '@/middlewares/requiredSubscription'
 import bot from '@/helpers/bot'
 import cleanupDownloadJobs from '@/helpers/cleanupDownloadJobs'
@@ -70,6 +71,7 @@ async function runApp() {
     .use(attachUser)
     .use(i18n.middleware())
     .use(configureI18n)
+    .use(allowedUserOnly)
     .use(requiredSubscription)
     .use(languageMenu)
 

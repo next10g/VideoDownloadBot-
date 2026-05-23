@@ -4,7 +4,7 @@
   "description": "Telegram bot to download videos",
   "main": "dist/app.js",
   "repository": "https://github.com/Borodutch/VideoDownloadBot",
-  "author": "backmeupplz <backmeupplz@gmail.com>",
+  "author": "Nour Mohamed (@Dev_Nour_M)",
   "license": "MIT",
   "engines": {
     "node": ">=20"

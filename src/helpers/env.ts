@@ -28,7 +28,10 @@ const env = cleanEnv(process.env, {
   WEBHOOK_URL: str({ desc: 'Public base URL, e.g. https://bot.example.com' }),
   WEBHOOK_SECRET: str({ desc: 'Secret token for Telegram webhook' }),
   PORT: num({ default: 3000 }),
-  USER_COOLDOWN_SECONDS: num({ default: 30 }),
+  USER_COOLDOWN_SECONDS: num({
+    default: 0,
+    desc: '0 = no wait between links',
+  }),
   DOWNLOAD_TIMEOUT_MS: num({ default: 900_000 }),
   UPLOAD_TIMEOUT_MS: num({
     default: 900_000,
