@@ -151,7 +151,11 @@ bash scripts/install-ffmpeg.sh
 bin/ffmpeg -version
 ```
 
-ثم أعد نشر التطبيق — سيُكتشف `bin/ffmpeg` تلقائياً.
+إذا ظهر `xz: Cannot exec` — السكربيت الجديد يجرّب `.tar.gz` ثم يستخرج `.tar.xz` عبر **python3** (بدون أمر `xz`).
+
+**ffmpeg اختياري** — TikTok نجح عندك بدون ffmpeg. الأهم الآن: إعادة نشر كود **رفع Telegram** مع إعدادات `.env` أدناه.
+
+ثم أعد نشر التطبيق — سيُكتشف `bin/ffmpeg` تلقائياً إن وُجد.
 
 ## خطأ `Network request for 'sendDocument' failed`
 
@@ -174,7 +178,15 @@ MAX_FILE_SIZE_MB=50
 curl -I https://api.telegram.org
 ```
 
-إذا فشل الاتصال من السيرفر، Hostinger يحجب الخارج — تواصل مع الدعم أو استخدم **Bot API محلي** (`BOT_API_URL`).
+`curl -I https://api.telegram.org` يعمل عندك (302) — الاتصال موجود. فعّل في `.env`:
+
+```env
+UPLOAD_TIMEOUT_MS=900000
+UPLOAD_MAX_RETRIES=5
+SKIP_THUMBNAILS=true
+```
+
+ثم أعد النشر وجرب TikTok مرة أخرى (ابحث في السجلات عن `upload complete`).
 
 ## SIGTERM في السجلات
 
