@@ -1,6 +1,5 @@
-import { access } from 'fs/promises'
-import { constants as fsConstants } from 'fs'
-import { resolve } from 'path'
+import { stat } from 'fs/promises'
+import { join, resolve } from 'path'
 import { cwd } from 'process'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
@@ -17,24 +16,86 @@ export function isYoutubeBotBlock(message: string): boolean {
   )
 }
 
+function isCookiePathError(message: string): boolean {
+  const m = message.toLowerCase()
+  return m.includes('is a directory') && m.includes('cookie')
+}
+
+export function isCookieConfigurationError(message: string): boolean {
+  return isCookiePathError(message)
+}
+
+async function isCookiesFile(filePath: string): Promise<boolean> {
+  try {
+    const info = await stat(filePath)
+    return info.isFile()
+  } catch {
+    return false
+  }
+}
+
+async function tryPath(filePath: string): Promise<string | undefined> {
+  if (!(await isCookiesFile(filePath))) {
+    return undefined
+  }
+  if (loggedPath !== filePath) {
+    loggedPath = filePath
+    logger.info('yt-dlp cookies file', { path: filePath })
+  }
+  return filePath
+}
+
+/** If user created a folder named `cookie/`, look for cookies.txt inside. */
+async function tryCookieDirectory(dirPath: string): Promise<string | undefined> {
+  try {
+    const info = await stat(dirPath)
+    if (!info.isDirectory()) {
+      return undefined
+    }
+  } catch {
+    return undefined
+  }
+  const innerNames = [
+    'cookies.txt',
+    'youtube.txt',
+    'www.youtube.com_cookies.txt',
+    'cookie.txt',
+  ]
+  for (const name of innerNames) {
+    const inner = join(dirPath, name)
+    const found = await tryPath(inner)
+    if (found) {
+      logger.warn('cookies found inside cookie/ folder — prefer a single file at ./cookies.txt', {
+        using: found,
+      })
+      return found
+    }
+  }
+  logger.error('cookie is a directory, not a file — upload cookies.txt into project root', {
+    path: dirPath,
+  })
+  return undefined
+}
+
 export async function resolveCookiesPath(): Promise<string | undefined> {
+  const root = cwd()
   const candidates = [
     env.COOKIES_PATH_RESOLVED,
-    resolve(cwd(), 'cookie'),
-    resolve(cwd(), 'cookies.txt'),
+    resolve(root, 'cookies.txt'),
+    resolve(root, 'cookie.txt'),
+    resolve(root, 'cookie'),
   ].filter((p): p is string => Boolean(p))
 
   for (const filePath of candidates) {
-    try {
-      await access(filePath, fsConstants.F_OK)
-      if (loggedPath !== filePath) {
-        loggedPath = filePath
-        logger.info('yt-dlp cookies file', { path: filePath })
-      }
-      return filePath
-    } catch {
-      // try next
+    const asFile = await tryPath(filePath)
+    if (asFile) {
+      return asFile
+    }
+    const fromDir = await tryCookieDirectory(filePath)
+    if (fromDir) {
+      return fromDir
     }
   }
+
   return undefined
 }

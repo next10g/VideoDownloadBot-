@@ -19,7 +19,10 @@ import logger from '@/lib/logger'
 import { buildDownloadFlags } from '@/services/ytdlpOptions'
 import { runYtdlpDownload } from '@/services/ytdlpRunner'
 import type { YtDlpMetadata } from '@/services/ytdlpTypes'
-import { isYoutubeBotBlock } from '@/services/ytdlpCookies'
+import {
+  isCookieConfigurationError,
+  isYoutubeBotBlock,
+} from '@/services/ytdlpCookies'
 import { validateMetadata } from '@/services/ytdlpProbe'
 
 function escapeTitle(title: string | undefined): string {
@@ -167,7 +170,10 @@ export default async function downloadUrl(
           error.message.includes('exceeds')
         ) {
           downloadJob.status = DownloadJobStatus.noSuitableVideoSize
-        } else if (isYoutubeBotBlock(error.message)) {
+        } else if (
+          isYoutubeBotBlock(error.message) ||
+          isCookieConfigurationError(error.message)
+        ) {
           downloadJob.status = DownloadJobStatus.failedYoutubeBot
         } else {
           downloadJob.status = DownloadJobStatus.failedDownload

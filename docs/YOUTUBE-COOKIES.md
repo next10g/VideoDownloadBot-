@@ -1,44 +1,64 @@
 # YouTube — ملف cookies
 
-على استضافة مشتركة (Hostinger) يوتيوب غالباً يظهر:
+## الخطأ: `Is a directory: .../cookie`
 
-```text
-Sign in to confirm you're not a bot
-```
+معناه إنك عملت **مجلد** اسمه `cookie` بدل **ملف**.
 
-**الحل:** رفع ملف كوكيز من حسابك على يوتيوب.
-
-## الخطوات
-
-1. على الكمبيوتر سجّل دخول [youtube.com](https://youtube.com) في Chrome أو Firefox.
-2. ثبّت إضافة **Get cookies.txt LOCALLY** (Chrome Web Store).
-3. من youtube.com → Export → احفظ الملف باسم `cookie` (بدون امتداد) أو `cookies.txt`.
-4. ارفع الملف إلى مجلد البوت على السيرفر:
-
-```text
-/home/u987639727/domains/t.nextegypt-agri.com/nodejs/cookie
-```
-
-5. الصلاحيات:
+### الحل السريع (SSH)
 
 ```bash
-chmod 600 cookie
+cd ~/domains/t.nextegypt-agri.com/nodejs
+
+# لو في مجلد cookie بالغلط
+ls -la cookie
+# لو مجلد: انقل الملف اللي جواه أو احذف المجلد
+rm -rf cookie
+
+# ارفع ملف cookies.txt (من إضافة المتصفح) هنا:
+# المسار الصحيح:
+nano cookies.txt
+# الصق محتوى الملف واحفظ (Ctrl+O, Enter, Ctrl+X)
+
+chmod 600 cookies.txt
+ls -la cookies.txt
+# لازم يظهر ملف (-rw-------) مش مجلد (drwx...)
 ```
 
-6. أعد تشغيل البوت. في السجلات يجب أن ترى:
+أعد تشغيل البوت. في السجلات:
 
 ```json
-{"msg":"yt-dlp cookies file","path":".../nodejs/cookie"}
+{"msg":"yt-dlp cookies file","path":".../cookies.txt"}
 ```
 
-## بديل في `.env`
+---
+
+## تصدير الكوكيز من المتصفح
+
+1. سجّل دخول [youtube.com](https://youtube.com).
+2. إضافة Chrome: **Get cookies.txt LOCALLY**.
+3. Export → احفظ باسم `cookies.txt`.
+4. ارفع إلى مجلد `nodejs/` على Hostinger (File Manager أو SFTP).
+
+**لا** تنشئ مجلد `cookie/` — استخدم ملف **`cookies.txt`** في جذر المشروع.
+
+### بدائل الاسم
+
+| المسار | يعمل |
+|--------|------|
+| `nodejs/cookies.txt` | نعم (مفضل) |
+| `nodejs/cookie` كملف | نعم |
+| `nodejs/cookie/` كمجلد | لا (إلا لو فيه `cookies.txt` جواه) |
+
+### `.env` (اختياري)
 
 ```env
-COOKIES_PATH=/full/path/to/cookie
+COOKIES_PATH=/home/u987639727/domains/t.nextegypt-agri.com/nodejs/cookies.txt
 ```
+
+---
 
 ## ملاحظات
 
-- حدّث الملف كل أسبوعين تقريباً إذا رجع الخطأ.
-- لا ترفع `cookie` على GitHub (سري).
-- TikTok غالباً يعمل بدون cookies.
+- لا ترفع الكوكيز على GitHub.
+- حدّث الملف كل ~2 أسبوع لو رجع خطأ «Sign in to confirm».
+- TikTok غالباً يشتغل بدون cookies.
