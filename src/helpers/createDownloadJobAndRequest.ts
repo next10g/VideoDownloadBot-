@@ -53,7 +53,19 @@ export default async function createDownloadJobAndRequest(
     const checkedUrl = await preflightUrl(url)
     await assertUserJobLimits(ctx.dbchat.telegramId, checkedUrl, ctx.dbchat.audio)
     if (!env.SKIP_YTDLP_PROBE) {
-      await probeUrlMetadata(checkedUrl)
+      try {
+        await probeUrlMetadata(checkedUrl)
+      } catch (probeError) {
+        if (env.SOFT_YTDLP_PROBE && isValidationError(probeError)) {
+          logger.warn('soft probe: continuing to download', {
+            url: checkedUrl,
+            code: probeError.code,
+            detail: probeError.message,
+          })
+        } else {
+          throw probeError
+        }
+      }
     }
 
     try {

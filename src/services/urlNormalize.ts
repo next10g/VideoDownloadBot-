@@ -10,6 +10,28 @@ const TRACKING_PARAMS = [
   'feature',
 ]
 
+/** Expand short hosts so yt-dlp gets a canonical URL. */
+function expandShortHosts(url: URL): void {
+  if (url.hostname === 'youtu.be') {
+    const id = url.pathname.replace(/^\//, '').split('/')[0]
+    if (id) {
+      url.hostname = 'www.youtube.com'
+      url.pathname = '/watch'
+      url.search = `?v=${id}`
+    }
+  }
+  if (
+    url.hostname.includes('youtube.com') &&
+    url.pathname.startsWith('/shorts/')
+  ) {
+    const id = url.pathname.split('/')[2]
+    if (id) {
+      url.pathname = '/watch'
+      url.search = `?v=${id}`
+    }
+  }
+}
+
 export function normalizeUrl(raw: string): string {
   const trimmed = raw.trim()
   try {
@@ -18,6 +40,7 @@ export function normalizeUrl(raw: string): string {
       return trimmed
     }
     url.hostname = url.hostname.toLowerCase().replace(/^www\./, '')
+    expandShortHosts(url)
     for (const param of TRACKING_PARAMS) {
       url.searchParams.delete(param)
     }

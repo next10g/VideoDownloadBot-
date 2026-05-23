@@ -5,7 +5,7 @@ import env from '@/helpers/env'
 import { TEMP_ROOT } from '@/helpers/tempDir'
 import { metrics, MetricsSnapshot } from '@/lib/metrics'
 import { getProcessStartedAt } from '@/lib/processLifecycle'
-import { getActiveYtdlpCount } from '@/services/ytdlpRunner'
+import { getActiveYtdlpCount } from '@/services/ytdlpSpawn'
 
 export interface HealthDiagnostics {
   status: 'ok'

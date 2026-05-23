@@ -96,7 +96,7 @@ export async function probeUrlMetadata(url: string): Promise<YtDlpMetadata> {
         'unsupported'
       )
     }
-    logger.warn('yt-dlp probe failed', { url, message })
+    logger.warn('yt-dlp probe failed', { url, detail: message })
     throw new ValidationError(
       message.length > 20
         ? `Could not inspect link: ${message.slice(0, 200)}`

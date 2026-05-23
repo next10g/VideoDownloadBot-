@@ -1,5 +1,5 @@
 import logger from '@/lib/logger'
-import { killAllYtdlpProcesses } from '@/services/ytdlpRunner'
+import { killAllYtdlpProcesses } from '@/services/ytdlpSpawn'
 import { sweepStaleTempDirs } from '@/helpers/tempMaintenance'
 
 const startedAt = Date.now()

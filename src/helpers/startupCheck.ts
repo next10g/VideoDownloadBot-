@@ -8,7 +8,8 @@ import env from '@/helpers/env'
 import logger from '@/lib/logger'
 import { TEMP_ROOT } from '@/helpers/tempDir'
 import { initYtdlpBinary } from '@/services/ytdlpBinary'
-import { formatYtdlpError, runYtdlpJson } from '@/services/ytdlpRunner'
+import { runYtdlpJson } from '@/services/ytdlpRunner'
+import { formatYtdlpError } from '@/services/ytdlpSpawn'
 import { buildProbeFlags } from '@/services/ytdlpOptions'
 
 const execFileAsync = promisify(execFile)
