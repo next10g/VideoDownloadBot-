@@ -115,7 +115,9 @@ YTDLP_NODE_PATH=/opt/alt/alt-nodejs22/root/usr/bin/node
 MAX_FILE_SIZE_MB=50
 SKIP_THUMBNAILS=true
 NODE_OPTIONS=--max-old-space-size=384
-# يوتيوب بدون كوكيز المستخدمين — راجع docs/YOUTUBE-PUBLIC-BOT.md
+# يوتيوب — راجع docs/YOUTUBE-PUBLIC-BOT.md و docs/YOUTUBE-COOKIES.md
+# تحقق من الكوكيز: bash scripts/verify-youtube-cookies.sh
+# مهم: عملية Node واحدة فقط (تجنب تشغيل البوت مرتين — يسبب DocumentNotFoundError)
 # لا تضبط YTDLP_PATH=/tmp/yt-dlp — /tmp غالباً noexec ويسبب EACCES
 # اتركه فارغاً أو استخدم المسار الكامل لـ bin/yt-dlp داخل التطبيق
 ```

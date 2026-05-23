@@ -38,14 +38,24 @@ echo "Using Node: $NODE"
 echo "Using cookies: $(pwd)/cookies.txt"
 echo "Running yt-dlp test download..."
 
+bash scripts/verify-youtube-cookies.sh || exit $?
+
 rm -f test.mp4
 
+set +e
 ./bin/yt-dlp \
   --cookies ./cookies.txt \
   --js-runtimes "node:$NODE" \
-  -f "best[ext=mp4][vcodec!=none][acodec!=none][protocol^=http]/best[ext=mp4][protocol^=http][height<=720]/best" \
+  -f "best[ext=mp4][height<=720]/best" \
   -o test.mp4 \
-  "https://www.youtube.com/watch?v=zSH15dIl7D0"
+  "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+CODE=$?
+set -e
+
+if [ "$CODE" -ne 0 ] || [ ! -f test.mp4 ]; then
+  echo "FAIL: download did not complete (exit $CODE)"
+  exit 1
+fi
 
 ls -lh test.mp4
 echo "OK: test.mp4 downloaded"

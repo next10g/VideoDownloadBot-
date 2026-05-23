@@ -24,11 +24,38 @@ import type { YtDlpMetadata } from '@/services/ytdlpTypes'
 import {
   isCookieConfigurationError,
   isYoutubeBotBlock,
+  isYoutubeCookiesInvalid,
 } from '@/services/ytdlpCookies'
 import { validateMetadata } from '@/services/ytdlpProbe'
 
 function escapeTitle(title: string | undefined): string {
   return (title || '').replace('<', '&lt;').replace('>', '&gt;')
+}
+
+function isDocumentNotFound(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === 'DocumentNotFoundError' ||
+      error.message.includes('No document found'))
+  )
+}
+
+async function saveDownloadJob(
+  downloadJob: DocumentType<DownloadJob>,
+  context: string
+): Promise<void> {
+  try {
+    await downloadJob.save()
+  } catch (error) {
+    if (isDocumentNotFound(error)) {
+      logger.warn('download job removed while processing', {
+        jobId: downloadJob.id,
+        context,
+      })
+      return
+    }
+    throw error
+  }
 }
 
 async function readInfoJson(
@@ -164,7 +191,7 @@ export default async function downloadUrl(
     const escapedTitle = escapeTitle(info?.title)
 
     downloadJob.status = DownloadJobStatus.uploading
-    await downloadJob.save()
+    await saveDownloadJob(downloadJob, 'uploading')
 
     const { doc: originalChat } = await findOrCreateChat(
       downloadJob.originalChatId
@@ -197,7 +224,7 @@ export default async function downloadUrl(
       escapedTitle || 'No title'
     )
     downloadJob.status = DownloadJobStatus.finished
-    await downloadJob.save()
+    await saveDownloadJob(downloadJob, 'finished')
     logger.info('download finished', { url: downloadJob.url, jobId: downloadJob.id })
   } catch (error) {
     metrics.increment('failedDownloads')
@@ -225,8 +252,16 @@ export default async function downloadUrl(
     } else if (downloadJob.status === DownloadJobStatus.uploading) {
       downloadJob.status = DownloadJobStatus.failedUpload
     }
-    await downloadJob.save()
-    report(error, { location: 'downloadUrl', meta: downloadJob.url })
+    await saveDownloadJob(downloadJob, 'failed')
+    if (error instanceof Error && isYoutubeCookiesInvalid(error.message)) {
+      logger.error(
+        'YouTube cookies invalid on server — export fresh cookies.txt from Chrome',
+        { url: downloadJob.url }
+      )
+    }
+    if (!isDocumentNotFound(error)) {
+      report(error, { location: 'downloadUrl', meta: downloadJob.url })
+    }
   } finally {
     await removePathSafe(jobDir)
   }

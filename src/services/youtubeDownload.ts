@@ -4,6 +4,7 @@ import logger from '@/lib/logger'
 import env from '@/helpers/env'
 import {
   cookiePoolSize,
+  isYoutubeCookiesInvalid,
   pickCookieForJob,
   shouldUseYoutubeCookies,
 } from '@/services/ytdlpCookies'
@@ -116,6 +117,12 @@ export async function runYoutubeDownload(
     }
   }
 
+  const detail = lastError?.message ?? ''
+  if (isYoutubeCookiesInvalid(detail)) {
+    logger.error(
+      'cookies.txt expired or rotated — re-export from Chrome while logged into YouTube. See docs/YOUTUBE-COOKIES.md'
+    )
+  }
   throw lastError ?? new Error('YouTube download failed')
 }
 

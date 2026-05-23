@@ -16,9 +16,19 @@ export function shouldLoadYoutubeCookiePool(): boolean {
   return shouldUseYoutubeCookies() || env.YOUTUBE_FALLBACK_COOKIES
 }
 
+export function isYoutubeCookiesInvalid(message: string): boolean {
+  const m = message.toLowerCase()
+  return (
+    m.includes('cookies are no longer valid') ||
+    m.includes('likely been rotated') ||
+    m.includes('account cookies are no longer valid')
+  )
+}
+
 export function isYoutubeBotBlock(message: string): boolean {
   const m = message.toLowerCase()
   return (
+    isYoutubeCookiesInvalid(m) ||
     m.includes('sign in to confirm') ||
     m.includes("you're not a bot") ||
     m.includes('not a bot') ||

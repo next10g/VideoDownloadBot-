@@ -103,11 +103,20 @@ class DownloadQueue {
         this.lastFinishedAt = Date.now()
         this.retries.delete(jobId)
       } catch (error) {
-        this.failedTotal++
-        this.lastError =
+        const message =
           error instanceof Error ? error.message : String(error)
-        report(error, { location: 'downloadQueue', meta: jobId })
-        await this.maybeRecover(jobId)
+        const missingJob =
+          error instanceof Error &&
+          (error.name === 'DocumentNotFoundError' ||
+            message.includes('No document found'))
+        if (missingJob) {
+          logger.warn('queue job deleted during run, skipping', { jobId })
+        } else {
+          this.failedTotal++
+          this.lastError = message
+          report(error, { location: 'downloadQueue', meta: jobId })
+          await this.maybeRecover(jobId)
+        }
       } finally {
         if (this.jobTimer) {
           clearTimeout(this.jobTimer)

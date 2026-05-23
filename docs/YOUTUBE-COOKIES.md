@@ -2,6 +2,31 @@
 
 > **بوت عام؟** اقرأ [YOUTUBE-PUBLIC-BOT.md](./YOUTUBE-PUBLIC-BOT.md) — الافتراضي `YOUTUBE_USE_COOKIES=false` ومفيش اعتماد على كوكيز المستخدمين.
 
+## تحذير: «cookies are no longer valid»
+
+لو yt-dlp يطبع:
+
+```text
+The provided YouTube account cookies are no longer valid.
+They have likely been rotated in the browser
+```
+
+**الملف القديم انتهى.** الحل الوحيد:
+
+1. على **الكمبيوتر**: Chrome → سجّل دخول [youtube.com](https://youtube.com)
+2. إضافة **Get cookies.txt LOCALLY** → Export **فوراً** (قبل ما تفتح تبويبات يوتيوب تانية)
+3. ارفع الملف الجديد كـ `cookies.txt` على السيرفر (`chmod 600`)
+4. تحقق:
+
+```bash
+bash scripts/verify-youtube-cookies.sh
+bash scripts/test-youtube.sh
+```
+
+لو الاتنين فشلوا → IP استضافة Hostinger محظور حتى مع كوكيز جديدة (PO Token أو VPS).
+
+---
+
 ## لماذا YouTube يفشل؟
 
 من اختبارك على SSH:
