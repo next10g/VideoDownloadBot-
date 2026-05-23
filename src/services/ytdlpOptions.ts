@@ -18,8 +18,8 @@ export function buildDownloadFlags(outputBase: string, audio: boolean): YtDlpFla
   return {
     ...baseFlags(),
     output: `${outputBase}.%(ext)s`,
-    writeinfojson: true,
-    writethumbnail: !audio && !env.SKIP_THUMBNAILS,
+    writeInfoJson: true,
+    writeThumbnail: !audio && !env.SKIP_THUMBNAILS,
     convertThumbnails: env.SKIP_THUMBNAILS ? undefined : 'jpg',
     mergeOutputFormat: 'mp4',
     format: audio
