@@ -124,7 +124,7 @@ async function runYtdlpYoutubeDownload(
   throw lastError ?? new Error('YouTube download failed')
 }
 
-/** Public bot: Piped → Invidious → (optional) yt-dlp. No cookies required. */
+/** Public bot: Invidious → Piped → (optional) yt-dlp. No cookies required. */
 export async function runYoutubeDownload(
   url: string,
   outputBase: string,
@@ -136,21 +136,21 @@ export async function runYoutubeDownload(
 
   if (useProxyYoutubeApis()) {
     try {
-      logger.info('youtube piped download', { jobId })
-      return await downloadPipedYoutube(url, outputBase, audio, timeoutMs)
-    } catch (error) {
-      const detail = fetchErrorDetail(error)
-      failures.push(`piped: ${detail}`)
-      logger.warn('youtube piped failed', { jobId, detail })
-    }
-
-    try {
       logger.info('youtube invidious download', { jobId })
       return await downloadInvidiousYoutube(url, outputBase, audio, timeoutMs)
     } catch (error) {
       const detail = fetchErrorDetail(error)
       failures.push(`invidious: ${detail}`)
       logger.warn('youtube invidious failed', { jobId, detail })
+    }
+
+    try {
+      logger.info('youtube piped download', { jobId })
+      return await downloadPipedYoutube(url, outputBase, audio, timeoutMs)
+    } catch (error) {
+      const detail = fetchErrorDetail(error)
+      failures.push(`piped: ${detail}`)
+      logger.warn('youtube piped failed', { jobId, detail })
     }
   }
 
@@ -174,8 +174,8 @@ export function logYoutubePublicMode(): void {
       mode === 'ytdlp'
         ? 'yt-dlp only'
         : mode === 'auto'
-          ? 'piped → invidious → yt-dlp'
-          : 'piped → invidious',
+          ? 'invidious → piped → yt-dlp'
+          : 'invidious → piped',
     pipedApis: env.PIPED_API_URLS.length || 'built-in list',
     invidiousApis: env.INVIDIOUS_API_URLS.length || 'built-in list',
     cookiePoolSize: cookiePoolSize(),

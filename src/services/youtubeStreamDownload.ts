@@ -34,7 +34,20 @@ export async function fetchJson<T>(
     if (!response.ok) {
       throw new Error(`${label} HTTP ${response.status}`)
     }
-    return (await response.json()) as T
+    const contentType = response.headers.get('content-type') || ''
+    const text = await response.text()
+    if (
+      contentType.includes('text/html') ||
+      text.trimStart().startsWith('<!DOCTYPE') ||
+      text.trimStart().startsWith('<html')
+    ) {
+      throw new Error(`${label} returned HTML (blocked or wrong URL)`)
+    }
+    try {
+      return JSON.parse(text) as T
+    } catch {
+      throw new Error(`${label} invalid JSON: ${text.slice(0, 80)}`)
+    }
   } finally {
     clearTimeout(timer)
   }

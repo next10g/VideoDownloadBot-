@@ -72,23 +72,23 @@ export function validateMetadata(meta: YtDlpMetadata, url: string): void {
 export async function probeUrlMetadata(url: string): Promise<YtDlpMetadata> {
   if (isYoutubeUrl(url) && useProxyYoutubeApis()) {
     try {
-      return await probePipedYoutube(url)
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        throw error
-      }
-      logger.warn('piped probe failed', {
-        url,
-        detail: error instanceof Error ? error.message : String(error),
-      })
-    }
-    try {
       return await probeInvidiousYoutube(url)
     } catch (error) {
       if (error instanceof ValidationError) {
         throw error
       }
-      logger.warn('invidious probe failed, trying yt-dlp', {
+      logger.warn('invidious probe failed', {
+        url,
+        detail: error instanceof Error ? error.message : String(error),
+      })
+    }
+    try {
+      return await probePipedYoutube(url)
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        throw error
+      }
+      logger.warn('piped probe failed, trying yt-dlp', {
         url,
         detail: error instanceof Error ? error.message : String(error),
       })

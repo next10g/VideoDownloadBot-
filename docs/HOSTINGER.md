@@ -93,12 +93,27 @@ node scripts/ytdlp-install-lib.js
 
 ### باقي الأوامر (بعد تفعيل Node في PATH)
 
+على **SSH** الأوامر `node` و `npm` غالباً **غير موجودة** في PATH. استخدم المسار الكامل:
+
 ```bash
-export YOUTUBE_DL_SKIP_PYTHON_CHECK=1
-export PATH=/opt/alt/alt-nodejs20/root/usr/bin:$PATH
-node scripts/hostinger-install.js
-npm run build-ts
-node dist/app.js
+cd ~/domains/t.nextegypt-agri.com/nodejs
+source scripts/hostinger-env.sh
+
+# أو مباشرة:
+/opt/alt/alt-nodejs20/root/usr/bin/node scripts/hostinger-install.js
+/opt/alt/alt-nodejs20/root/usr/bin/npm run build-ts
+```
+
+أمر التثبيت في **hPanel** (بدون SSH):
+
+```text
+/opt/alt/alt-nodejs20/root/usr/bin/node scripts/hostinger-install.js
+```
+
+أمر التشغيل:
+
+```text
+/opt/alt/alt-nodejs20/root/usr/bin/node dist/app.js
 ```
 
 ---
@@ -108,21 +123,47 @@ node dist/app.js
 ```env
 YOUTUBE_BACKEND=auto
 PIPED_API_TIMEOUT_MS=60000
-NODE_OPTIONS=--dns-result-order=ipv4first
 YOUTUBE_USER_COOLDOWN_SECONDS=15
 YTDLP_NODE_PATH=/opt/alt/alt-nodejs22/root/usr/bin/node
 YOUTUBE_USE_COOKIES=false
 YOUTUBE_FALLBACK_COOKIES=false
-YTDLP_NODE_PATH=/opt/alt/alt-nodejs22/root/usr/bin/node
 MAX_FILE_SIZE_MB=50
 SKIP_THUMBNAILS=true
-NODE_OPTIONS=--max-old-space-size=384
+# Optional memory limit only (one line — do NOT use dns-result-order on Hostinger):
+# NODE_OPTIONS=--max-old-space-size=384
 # يوتيوب — راجع docs/YOUTUBE-PUBLIC-BOT.md و docs/YOUTUBE-COOKIES.md
 # تحقق من الكوكيز: bash scripts/verify-youtube-cookies.sh
 # مهم: عملية Node واحدة فقط (تجنب تشغيل البوت مرتين — يسبب DocumentNotFoundError)
 # لا تضبط YTDLP_PATH=/tmp/yt-dlp — /tmp غالباً noexec ويسبب EACCES
 # اتركه فارغاً أو استخدم المسار الكامل لـ bin/yt-dlp داخل التطبيق
 ```
+
+## خطأ `NODE_OPTIONS` / `--DNS-RESULT-ORDER= is not allowed`
+
+يظهر أثناء `npm install` على Hostinger إذا كان في **`.env`** أو **لوحة التحكم**:
+
+```env
+NODE_OPTIONS=--dns-result-order=ipv4first
+```
+
+Hostinger أحياناً يحوّله إلى `--DNS-RESULT-ORDER=` ويفشل Node قبل أي سكربت.
+
+**الحل:**
+
+1. افتح `.env` واحذف أي سطر فيه `dns-result-order` أو `DNS-RESULT-ORDER`.
+2. في hPanel → Node.js → Environment variables: احذف `NODE_OPTIONS` أو اجعله فقط:
+   ```text
+   --max-old-space-size=384
+   ```
+3. أمر التثبيت في Hostinger:
+   ```text
+   node scripts/hostinger-install.js
+   ```
+   (السكربت ينظّف `NODE_OPTIONS` تلقائياً قبل `npm install`)
+
+**لا تستخدم** `--dns-result-order` على Hostinger — غير مدعوم في بيئة التثبيت.
+
+---
 
 ## خطأ `EACCES` أثناء `postinstall` / `ensure-ytdlp`
 

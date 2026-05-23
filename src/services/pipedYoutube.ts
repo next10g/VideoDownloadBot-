@@ -37,16 +37,11 @@ interface PipedStreamsResponse {
 const DEFAULT_PIPED_APIS = [
   'https://pipedapi.tokhmi.xyz',
   'https://pipedapi.moomoo.me',
-  'https://pipedapi.syncpundit.io',
   'https://api-piped.mha.fi',
-  'https://piped-api.garudalinux.org',
-  'https://pipedapi.rivo.lol',
   'https://piped-api.lunar.icu',
-  'https://pipedapi.colinslegacy.com',
-  'https://piped-api.cfe.re',
-  'https://pipedapi.r4fo.com',
+  'https://ytapi.dc09.ru',
+  'https://yapi.vyper.me',
   'https://pipedapi.kavin.rocks',
-  'https://pipedapi.adminforge.de',
 ]
 
 function pipedApiBases(): string[] {
