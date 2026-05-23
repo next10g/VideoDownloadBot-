@@ -106,7 +106,9 @@ node dist/app.js
 ## `.env` موصى به (بوت عام)
 
 ```env
-YOUTUBE_BACKEND=piped
+YOUTUBE_BACKEND=auto
+PIPED_API_TIMEOUT_MS=60000
+NODE_OPTIONS=--dns-result-order=ipv4first
 YOUTUBE_USER_COOLDOWN_SECONDS=15
 YTDLP_NODE_PATH=/opt/alt/alt-nodejs22/root/usr/bin/node
 YOUTUBE_USE_COOKIES=false

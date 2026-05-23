@@ -6,10 +6,14 @@ export function youtubeBackendMode(): YoutubeBackendMode {
   return env.YOUTUBE_BACKEND as YoutubeBackendMode
 }
 
-/** Public bot default: Piped first (no cookies). */
-export function usePipedForYoutube(): boolean {
+/** Piped + Invidious (no cookies). */
+export function useProxyYoutubeApis(): boolean {
   const mode = youtubeBackendMode()
   return mode === 'piped' || mode === 'auto'
+}
+
+export function usePipedForYoutube(): boolean {
+  return useProxyYoutubeApis()
 }
 
 export function useYtdlpForYoutube(): boolean {

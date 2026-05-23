@@ -1,0 +1,101 @@
+import { createWriteStream } from 'fs'
+import { Readable } from 'stream'
+import { pipeline } from 'stream/promises'
+import env from '@/helpers/env'
+import logger from '@/lib/logger'
+
+export function fetchErrorDetail(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return String(error)
+  }
+  const cause = (error as Error & { cause?: unknown }).cause
+  if (cause instanceof Error && cause.message) {
+    return `${error.message} (${cause.message})`
+  }
+  return error.message
+}
+
+export async function fetchJson<T>(
+  url: string,
+  label: string,
+  timeoutMs: number
+): Promise<T> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'Mozilla/5.0 (compatible; VideoDownloadBot/1.0)',
+      },
+      redirect: 'follow',
+    })
+    if (!response.ok) {
+      throw new Error(`${label} HTTP ${response.status}`)
+    }
+    return (await response.json()) as T
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+export async function downloadStreamToFile(
+  streamUrl: string,
+  destPath: string,
+  timeoutMs: number
+): Promise<void> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(streamUrl, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; VideoDownloadBot/1.0)',
+        Referer: 'https://www.youtube.com/',
+      },
+      redirect: 'follow',
+    })
+    if (!response.ok) {
+      throw new Error(`Stream download HTTP ${response.status}`)
+    }
+    const contentLength = Number(response.headers.get('content-length') || 0)
+    if (contentLength > env.MAX_FILE_SIZE_BYTES) {
+      throw new Error(
+        `Stream exceeds ${env.MAX_FILE_SIZE_MB}MB (Content-Length ${contentLength})`
+      )
+    }
+    if (!response.body) {
+      throw new Error('Empty stream body')
+    }
+
+    const nodeStream = Readable.fromWeb(
+      response.body as import('stream/web').ReadableStream<Uint8Array>
+    )
+    const file = createWriteStream(destPath)
+    let written = 0
+    nodeStream.on('data', (chunk: Buffer) => {
+      written += chunk.length
+      if (written > env.MAX_FILE_SIZE_BYTES) {
+        nodeStream.destroy(new Error(`Download exceeds ${env.MAX_FILE_SIZE_MB}MB`))
+      }
+    })
+    await pipeline(nodeStream, file)
+    logger.info('stream saved', { destPath, bytes: written })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+export function parseHeightLabel(label: string): number {
+  const match = label.match(/(\d{3,4})/)
+  return match ? Number(match[1]) : 0
+}
+
+export function parseByteSize(value: string | number | undefined): number {
+  if (value === undefined) {
+    return 0
+  }
+  const n = typeof value === 'number' ? value : Number(String(value).replace(/,/g, ''))
+  return Number.isFinite(n) ? n : 0
+}

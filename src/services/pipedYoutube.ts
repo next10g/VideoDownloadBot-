@@ -1,8 +1,4 @@
-import { createWriteStream } from 'fs'
 import { writeFile } from 'fs/promises'
-import { extname } from 'path'
-import { Readable } from 'stream'
-import { pipeline } from 'stream/promises'
 import env from '@/helpers/env'
 import { extractYoutubeVideoId } from '@/helpers/youtubeVideoId'
 import { ValidationError } from '@/lib/errors'
@@ -10,6 +6,13 @@ import logger from '@/lib/logger'
 import { validateMetadata } from '@/services/ytdlpProbe'
 import type { YtDlpMetadata } from '@/services/ytdlpTypes'
 import type { YtdlpDownloadResult } from '@/services/ytdlpSpawn'
+import {
+  downloadStreamToFile,
+  fetchErrorDetail,
+  fetchJson,
+  parseByteSize,
+  parseHeightLabel,
+} from '@/services/youtubeStreamDownload'
 
 interface PipedStreamItem {
   url: string
@@ -30,20 +33,24 @@ interface PipedStreamsResponse {
   audioStreams?: PipedStreamItem[]
 }
 
+/** Public Piped API mirrors (rotate on failure). */
 const DEFAULT_PIPED_APIS = [
+  'https://pipedapi.tokhmi.xyz',
+  'https://pipedapi.moomoo.me',
+  'https://pipedapi.syncpundit.io',
+  'https://api-piped.mha.fi',
+  'https://piped-api.garudalinux.org',
+  'https://pipedapi.rivo.lol',
+  'https://piped-api.lunar.icu',
+  'https://pipedapi.colinslegacy.com',
+  'https://piped-api.cfe.re',
+  'https://pipedapi.r4fo.com',
   'https://pipedapi.kavin.rocks',
   'https://pipedapi.adminforge.de',
-  'https://api.piped.privacydev.net',
 ]
 
 function pipedApiBases(): string[] {
-  const custom = env.PIPED_API_URLS
-  return custom.length > 0 ? custom : DEFAULT_PIPED_APIS
-}
-
-function parseHeight(quality: string): number {
-  const match = quality.match(/(\d{3,4})/)
-  return match ? Number(match[1]) : 0
+  return env.PIPED_API_URLS.length > 0 ? env.PIPED_API_URLS : DEFAULT_PIPED_APIS
 }
 
 function streamSize(item: PipedStreamItem): number {
@@ -56,7 +63,7 @@ function fitsLimits(item: PipedStreamItem, audio: boolean): boolean {
     return false
   }
   if (!audio) {
-    const height = parseHeight(item.quality)
+    const height = parseHeightLabel(item.quality)
     if (height > env.YOUTUBE_MAX_HEIGHT) {
       return false
     }
@@ -82,7 +89,7 @@ function pickVideoStream(streams: PipedStreamItem[]): PipedStreamItem {
     throw new Error('No suitable Piped video stream under size/height limit')
   }
   candidates.sort((a, b) => {
-    const h = parseHeight(b.quality) - parseHeight(a.quality)
+    const h = parseHeightLabel(b.quality) - parseHeightLabel(a.quality)
     if (h !== 0) {
       return h
     }
@@ -102,67 +109,23 @@ async function fetchPipedStreams(videoId: string): Promise<PipedStreamsResponse>
   for (const base of pipedApiBases()) {
     const apiUrl = `${base.replace(/\/$/, '')}/streams/${videoId}`
     try {
-      const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), env.PIPED_API_TIMEOUT_MS)
-      const response = await fetch(apiUrl, {
-        signal: controller.signal,
-        headers: { Accept: 'application/json', 'User-Agent': 'VideoDownloadBot/1.0' },
-      })
-      clearTimeout(timer)
-      if (!response.ok) {
-        throw new Error(`Piped API ${response.status} at ${base}`)
-      }
-      const data = (await response.json()) as PipedStreamsResponse
+      const data = await fetchJson<PipedStreamsResponse>(
+        apiUrl,
+        `Piped ${base}`,
+        env.PIPED_API_TIMEOUT_MS
+      )
       logger.info('piped streams ok', { base, videoId, title: data.title })
       return data
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error))
-      logger.warn('piped api failed', { base, videoId, detail: lastError.message })
+      logger.warn('piped api failed', {
+        base,
+        videoId,
+        detail: fetchErrorDetail(error),
+      })
     }
   }
   throw lastError ?? new Error('All Piped API instances failed')
-}
-
-async function downloadStreamToFile(
-  streamUrl: string,
-  destPath: string,
-  timeoutMs: number
-): Promise<void> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    const response = await fetch(streamUrl, {
-      signal: controller.signal,
-      headers: { 'User-Agent': 'VideoDownloadBot/1.0' },
-    })
-    if (!response.ok) {
-      throw new Error(`Stream download HTTP ${response.status}`)
-    }
-    const contentLength = Number(response.headers.get('content-length') || 0)
-    if (contentLength > env.MAX_FILE_SIZE_BYTES) {
-      throw new Error(
-        `Stream exceeds ${env.MAX_FILE_SIZE_MB}MB (Content-Length ${contentLength})`
-      )
-    }
-    if (!response.body) {
-      throw new Error('Empty stream body')
-    }
-
-    const nodeStream = Readable.fromWeb(
-      response.body as import('stream/web').ReadableStream<Uint8Array>
-    )
-    const file = createWriteStream(destPath)
-    let written = 0
-    nodeStream.on('data', (chunk: Buffer) => {
-      written += chunk.length
-      if (written > env.MAX_FILE_SIZE_BYTES) {
-        nodeStream.destroy(new Error(`Download exceeds ${env.MAX_FILE_SIZE_MB}MB`))
-      }
-    })
-    await pipeline(nodeStream, file)
-  } finally {
-    clearTimeout(timer)
-  }
 }
 
 function toMetadata(data: PipedStreamsResponse, ext: string): YtDlpMetadata {
@@ -211,11 +174,8 @@ export async function downloadPipedYoutube(
     ? pickAudioStream(data.audioStreams ?? [])
     : pickVideoStream(data.videoStreams ?? [])
 
-  const ext = audio
-    ? extname(new URL(stream.url).pathname) || '.m4a'
-    : '.mp4'
-  const normalizedExt = ext.startsWith('.') ? ext : `.${ext}`
-  const destPath = `${outputBase}${normalizedExt}`
+  const ext = audio ? '.m4a' : '.mp4'
+  const destPath = `${outputBase}${ext}`
 
   logger.info('piped download stream', {
     videoId,
@@ -226,7 +186,7 @@ export async function downloadPipedYoutube(
 
   await downloadStreamToFile(stream.url, destPath, timeoutMs)
 
-  const meta = toMetadata(data, normalizedExt.replace(/^\./, ''))
+  const meta = toMetadata(data, ext.replace(/^\./, ''))
   await writeFile(`${outputBase}.info.json`, JSON.stringify(meta), 'utf8')
 
   return { stderr: '' }

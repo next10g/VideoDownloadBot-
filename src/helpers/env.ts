@@ -63,12 +63,16 @@ const env = cleanEnv(process.env, {
   FFMPEG_PATH: str({ default: '' }),
   YOUTUBE_BACKEND: str({
     choices: ['piped', 'ytdlp', 'auto'],
-    default: 'piped',
-    desc: 'piped = no cookies (public bot). auto = piped then yt-dlp',
+    default: 'auto',
+    desc: 'piped = Piped+Invidious. auto = + yt-dlp fallback. ytdlp = direct only',
   }),
   PIPED_API_URLS: commaList({
     default: [],
-    desc: 'Optional Piped API bases (comma-separated). Empty = built-in public instances',
+    desc: 'Optional Piped API bases (comma-separated). Empty = built-in list',
+  }),
+  INVIDIOUS_API_URLS: commaList({
+    default: [],
+    desc: 'Optional Invidious API bases (comma-separated). Empty = built-in list',
   }),
   PIPED_API_TIMEOUT_MS: num({ default: 45_000 }),
   YOUTUBE_MAX_HEIGHT: num({ default: 720 }),

@@ -2,9 +2,10 @@ import { readdir } from 'fs/promises'
 import { basename, dirname } from 'path'
 import logger from '@/lib/logger'
 import env from '@/helpers/env'
+import { downloadInvidiousYoutube } from '@/services/invidiousYoutube'
 import { downloadPipedYoutube } from '@/services/pipedYoutube'
 import {
-  usePipedForYoutube,
+  useProxyYoutubeApis,
   useYtdlpForYoutube,
   youtubeBackendMode,
 } from '@/services/youtubeBackend'
@@ -16,6 +17,7 @@ import {
 } from '@/services/ytdlpCookies'
 import { runYtdlpDownload } from '@/services/ytdlpRunner'
 import type { YtdlpDownloadResult } from '@/services/ytdlpSpawn'
+import { fetchErrorDetail } from '@/services/youtubeStreamDownload'
 import {
   buildFlagsForYoutubeStrategy,
   isYoutubeBotBlockMessage,
@@ -72,8 +74,8 @@ async function hasDownloadArtifact(outputBase: string): Promise<boolean> {
   }
 }
 
-function isRetryableYoutubeFailure(message: string, stderr: string): boolean {
-  const text = `${message}\n${stderr}`.toLowerCase()
+function isRetryableYoutubeFailure(message: string): boolean {
+  const text = message.toLowerCase()
   if (isYoutubeBotBlockMessage(text)) {
     return true
   }
@@ -101,21 +103,14 @@ async function runYtdlpYoutubeDownload(
       logger.info('youtube yt-dlp strategy', { jobId, strategy: strategy.id })
       const result = await runYtdlpDownload(url, flags, timeoutMs, 'download')
       if (!(await hasDownloadArtifact(outputBase))) {
-        logger.warn('youtube strategy produced no file', {
-          jobId,
-          strategy: strategy.id,
-          stderr: result.stderr.slice(0, 300),
-        })
-        lastError = new Error(
-          result.stderr.trim() || 'yt-dlp finished but wrote no media file'
-        )
+        lastError = new Error('yt-dlp finished but wrote no media file')
         continue
       }
       return result
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       lastError = error instanceof Error ? error : new Error(message)
-      if (!isRetryableYoutubeFailure(message, '')) {
+      if (!isRetryableYoutubeFailure(message)) {
         throw lastError
       }
       logger.warn('youtube yt-dlp blocked', { jobId, strategy: strategy.id })
@@ -124,14 +119,12 @@ async function runYtdlpYoutubeDownload(
 
   const detail = lastError?.message ?? ''
   if (isYoutubeCookiesInvalid(detail)) {
-    logger.error(
-      'cookies.txt expired — not needed if YOUTUBE_BACKEND=piped. See docs/YOUTUBE-PUBLIC-BOT.md'
-    )
+    logger.error('cookies.txt expired — use YOUTUBE_BACKEND=auto and no cookies')
   }
   throw lastError ?? new Error('YouTube download failed')
 }
 
-/** YouTube for public bots: Piped API (no cookies) with optional yt-dlp fallback. */
+/** Public bot: Piped → Invidious → (optional) yt-dlp. No cookies required. */
 export async function runYoutubeDownload(
   url: string,
   outputBase: string,
@@ -139,33 +132,53 @@ export async function runYoutubeDownload(
   jobId: string,
   timeoutMs: number
 ): Promise<YtdlpDownloadResult> {
-  if (usePipedForYoutube()) {
+  const failures: string[] = []
+
+  if (useProxyYoutubeApis()) {
     try {
       logger.info('youtube piped download', { jobId })
       return await downloadPipedYoutube(url, outputBase, audio, timeoutMs)
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      logger.warn('youtube piped failed', { jobId, detail: message })
-      if (!useYtdlpForYoutube()) {
-        throw error instanceof Error ? error : new Error(message)
-      }
-      logger.info('youtube falling back to yt-dlp', { jobId })
+      const detail = fetchErrorDetail(error)
+      failures.push(`piped: ${detail}`)
+      logger.warn('youtube piped failed', { jobId, detail })
+    }
+
+    try {
+      logger.info('youtube invidious download', { jobId })
+      return await downloadInvidiousYoutube(url, outputBase, audio, timeoutMs)
+    } catch (error) {
+      const detail = fetchErrorDetail(error)
+      failures.push(`invidious: ${detail}`)
+      logger.warn('youtube invidious failed', { jobId, detail })
     }
   }
 
-  return runYtdlpYoutubeDownload(url, outputBase, audio, jobId, timeoutMs)
+  if (useYtdlpForYoutube()) {
+    logger.info('youtube falling back to yt-dlp', { jobId })
+    return runYtdlpYoutubeDownload(url, outputBase, audio, jobId, timeoutMs)
+  }
+
+  throw new Error(
+    failures.length > 0
+      ? `YouTube unavailable (${failures.join(' | ')})`
+      : 'YouTube download not configured'
+  )
 }
 
 export function logYoutubePublicMode(): void {
   const mode = youtubeBackendMode()
-  const pool = cookiePoolSize()
   logger.info('YouTube backend', {
     mode,
-    pipedApis: env.PIPED_API_URLS.length || 'default list',
-    maxHeight: env.YOUTUBE_MAX_HEIGHT,
-    cookiePoolSize: pool,
-    cookiesEnabled:
-      env.YOUTUBE_FALLBACK_COOKIES || env.YOUTUBE_USE_COOKIES,
+    flow:
+      mode === 'ytdlp'
+        ? 'yt-dlp only'
+        : mode === 'auto'
+          ? 'piped → invidious → yt-dlp'
+          : 'piped → invidious',
+    pipedApis: env.PIPED_API_URLS.length || 'built-in list',
+    invidiousApis: env.INVIDIOUS_API_URLS.length || 'built-in list',
+    cookiePoolSize: cookiePoolSize(),
     userCooldownSec: env.YOUTUBE_USER_COOLDOWN_SECONDS,
   })
 }

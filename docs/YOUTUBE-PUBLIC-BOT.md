@@ -6,7 +6,7 @@ Public bots **cannot** rely on one person’s `cookies.txt` — Google rotates t
 
 | Setting | Value |
 |--------|--------|
-| `YOUTUBE_BACKEND` | `piped` (default) |
+| `YOUTUBE_BACKEND` | `auto` (default): Piped → Invidious → yt-dlp |
 
 How it works:
 
@@ -23,14 +23,21 @@ Fallback: `YOUTUBE_BACKEND=auto` tries Piped first, then yt-dlp if Piped is down
 ## Recommended `.env` (Hostinger public bot)
 
 ```env
-YOUTUBE_BACKEND=piped
+YOUTUBE_BACKEND=auto
 YOUTUBE_USER_COOLDOWN_SECONDS=15
 MAX_FILE_SIZE_MB=50
-YTDLP_NODE_PATH=/opt/alt/alt-nodejs22/root/usr/bin/node
+PIPED_API_TIMEOUT_MS=60000
+NODE_OPTIONS=--dns-result-order=ipv4first
 
-# Do not use cookies for a public bot:
 YOUTUBE_USE_COOKIES=false
 YOUTUBE_FALLBACK_COOKIES=false
+```
+
+If Piped returns 502 on your host, Invidious is tried automatically. Logs:
+
+```json
+{"msg":"youtube invidious download"}
+{"msg":"invidious video ok","base":"https://inv.tux.pizza"}
 ```
 
 Deploy, `npm run build-ts`, restart **one** Node process.
