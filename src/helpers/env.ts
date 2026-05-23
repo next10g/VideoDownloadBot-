@@ -69,6 +69,10 @@ const env = cleanEnv(process.env, {
     default: true,
     desc: 'After anonymous clients fail, try cookies.txt / cookies-pool (server-side only)',
   }),
+  YOUTUBE_COOKIES_FIRST: bool({
+    default: true,
+    desc: 'When cookies.txt exists, try cookie strategies before anonymous (fewer IP blocks)',
+  }),
   YOUTUBE_COOKIE_POOL_DIR: str({
     default: '',
     desc: 'Directory of cookies-pool/*.txt when YOUTUBE_USE_COOKIES=true (rotates per job)',

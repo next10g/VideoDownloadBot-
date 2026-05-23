@@ -17,6 +17,22 @@ const progressiveVideoFormat = [
 export interface DownloadFlagOverrides {
   extractorArgs?: string
   cookiesPath?: string
+  /** Looser format (matches working manual yt-dlp on Hostinger). */
+  relaxedFormat?: boolean
+}
+
+function videoFormat(audio: boolean, relaxed: boolean): string {
+  if (audio) {
+    return `bestaudio[filesize<=${maxFilesize}]/bestaudio[filesize_approx<=${maxFilesize}]/bestaudio`
+  }
+  if (relaxed) {
+    return [
+      `best[ext=mp4][height<=720][filesize<=${maxFilesize}]`,
+      `best[height<=720][filesize<=${maxFilesize}]`,
+      'best',
+    ].join('/')
+  }
+  return progressiveVideoFormat
 }
 
 let cookiesPoolReady = false
@@ -53,15 +69,16 @@ export function buildDownloadFlags(
   const ffmpeg = getFfmpegPath()
   const thumbs = !audio && !env.SKIP_THUMBNAILS
 
+  const relaxed = overrides?.relaxedFormat ?? Boolean(overrides?.cookiesPath)
   const flags: YtDlpFlags = {
     ...baseFlags(overrides),
     quiet: true,
     output: `${outputBase}.%(ext)s`,
     writeInfoJson: true,
-    format: audio
-      ? `bestaudio[filesize<=${maxFilesize}]/bestaudio[filesize_approx<=${maxFilesize}]/bestaudio`
-      : progressiveVideoFormat,
-    formatSort: 'res:720,ext:mp4:m4a,proto:https,codec:h264,size',
+    format: videoFormat(audio, relaxed),
+    formatSort: relaxed
+      ? 'res:720,ext:mp4:m4a,size'
+      : 'res:720,ext:mp4:m4a,proto:https,codec:h264,size',
   }
 
   if (ffmpeg) {

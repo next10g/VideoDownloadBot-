@@ -43,9 +43,15 @@ function spawnYtdlp(
       label,
       url,
       binary,
-      args: args.slice(0, -1).map((arg) =>
-        /^--cookies(=|$)/.test(arg) ? '--cookies=***' : arg
-      ),
+      args: args.slice(0, -1).map((arg, i, arr) => {
+        if (arg === '--cookies' && arr[i + 1]) {
+          return '--cookies'
+        }
+        if (i > 0 && arr[i - 1] === '--cookies') {
+          return '***'
+        }
+        return arg
+      }),
     })
   }
 

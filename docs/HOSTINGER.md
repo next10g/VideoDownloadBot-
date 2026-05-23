@@ -108,7 +108,9 @@ node dist/app.js
 ```env
 YOUTUBE_USE_COOKIES=false
 YOUTUBE_FALLBACK_COOKIES=true
+YOUTUBE_COOKIES_FIRST=true
 YOUTUBE_USER_COOLDOWN_SECONDS=20
+YTDLP_NODE_PATH=/opt/alt/alt-nodejs22/root/usr/bin/node
 YTDLP_NODE_PATH=/opt/alt/alt-nodejs22/root/usr/bin/node
 MAX_FILE_SIZE_MB=50
 SKIP_THUMBNAILS=true
