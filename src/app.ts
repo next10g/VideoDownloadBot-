@@ -14,6 +14,7 @@ import configureI18n from '@/middlewares/configureI18n'
 import downloadQueue from '@/helpers/downloadQueue'
 import env from '@/helpers/env'
 import handleAudio from '@/handlers/audio'
+import handleImage from '@/handlers/image'
 import handleHelp from '@/handlers/help'
 import handleLanguage from '@/handlers/language'
 import handleUrl from '@/handlers/url'
@@ -91,6 +92,7 @@ async function runApp() {
   bot.command(['help', 'download'], handleHelp)
   bot.command('language', handleLanguage)
   bot.command('audio', handleAudio)
+  bot.command('image', handleImage)
   bot.command('refer', handleRefer)
   bot.command('stats', handleAdminStats)
   bot.command('users', handleAdminStats)

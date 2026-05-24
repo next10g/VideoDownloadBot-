@@ -28,7 +28,9 @@ import { assertUserJobLimits } from '@/services/jobGuards'
 import { probeUrlMetadata } from '@/services/ytdlpProbe'
 import { preflightUrl } from '@/services/urlPreflight'
 import { normalizeUrl } from '@/services/urlNormalize'
+import { isFacebookUrl } from '@/helpers/facebookUrl'
 import { isYoutubeUrl } from '@/helpers/youtubeUrl'
+import { isFacebookShareLink } from '@/services/facebookShareProbe'
 import {
   isOnYoutubeCooldown,
   touchYoutubeCooldown,
@@ -80,7 +82,12 @@ export default async function createDownloadJobAndRequest(
   try {
     const checkedUrl = await preflightUrl(url)
     await assertUserJobLimits(ctx.dbchat.telegramId, checkedUrl, audio)
-    if (!env.SKIP_YTDLP_PROBE && !requestOpts.directStreamUrl) {
+    const skipProbe =
+      Boolean(requestOpts.directStreamUrl) ||
+      (requestOpts.downloadMode === DownloadMode.image &&
+        isFacebookUrl(checkedUrl) &&
+        isFacebookShareLink(checkedUrl))
+    if (!env.SKIP_YTDLP_PROBE && !skipProbe) {
       try {
         await probeUrlMetadata(checkedUrl)
       } catch (probeError) {

@@ -49,6 +49,14 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
     return ctx.reply(blockedUserMessage(ctx))
   }
 
+  if (ctx.dbchat.imagePreferred) {
+    return createDownloadJobAndRequest(ctx, rawUrl, {
+      downloadMode: DownloadMode.image,
+      maxHeight: 0,
+      audio: false,
+    })
+  }
+
   const statusMsg = await ctx.reply(ctx.i18n.t('status_validating'))
   const editor = new MessageEditor(statusMsg.message_id, ctx)
 

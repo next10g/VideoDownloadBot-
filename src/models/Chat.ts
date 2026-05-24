@@ -20,6 +20,10 @@ export class Chat extends FindOrCreate {
   @prop({ required: true, default: false })
   audio!: boolean
 
+  /** When true, next links download as image (toggle via /image). */
+  @prop({ required: true, default: false })
+  imagePreferred!: boolean
+
   @prop()
   lastUrl?: string
 

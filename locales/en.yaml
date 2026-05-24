@@ -14,6 +14,7 @@ help: |
   /start — main menu
   /language — change language
   /audio — default audio-only mode
+  /image — image mode (enable before sending a link)
   /refer — your invite link
 
   After the link, choose quality / audio / image.
@@ -38,6 +39,12 @@ language: 😶 Please select a language.
 language_selected: 😎 English selected.
 audio_on: 📣 I'll convert downloads to audio only.
 audio_off: 🎥 I'll download video as usual.
+image_on: |
+  🖼 <b>Image mode ON</b>
+
+  Send any link (especially Facebook Share) and I'll try to download it as an image.
+  Send /image again to turn off.
+image_off: 🎥 Back to normal — after each link you'll pick video / audio / image.
 # Progress states
 status_validating: 🔍 Checking your link...
 status_queued: 🕐 Added to queue — your turn is coming!

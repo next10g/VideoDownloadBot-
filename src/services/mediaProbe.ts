@@ -168,6 +168,7 @@ export async function probeMediaOffer(url: string): Promise<MediaFormatOffer> {
       resolvedUrl: downloadUrl,
       photoOrPost,
       strictPhoto: isStrictFacebookPhotoOnly(downloadUrl, url),
+      isShare: isFacebookShareLink(url),
     })
 
     if (isStrictFacebookPhotoOnly(downloadUrl, url)) {

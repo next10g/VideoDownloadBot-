@@ -1,8 +1,6 @@
 import env from '@/helpers/env'
 import { ValidationError } from '@/lib/errors'
-import { isFacebookUrl } from '@/helpers/facebookUrl'
 import { normalizeUrl } from '@/services/urlNormalize'
-import { resolveFacebookUrl } from '@/services/resolveFacebookUrl'
 
 export function assertValidUrlShape(url: string): void {
   try {
@@ -40,10 +38,6 @@ export async function preflightUrl(rawUrl: string): Promise<string> {
   let url = normalizeUrl(rawUrl)
   assertValidUrlShape(url)
   assertNotBlacklisted(url)
-
-  if (isFacebookUrl(url)) {
-    url = await resolveFacebookUrl(url)
-  }
 
   if (!DIRECT_MEDIA.test(url)) {
     return url
