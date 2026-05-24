@@ -27,7 +27,7 @@ export function validateMetadata(meta: YtDlpMetadata, url: string): void {
     if (isSocialCarouselMeta(meta, url)) {
       return
     }
-    throw new ValidationError('Playlists are not supported', 'playlist')
+    return
   }
 
   if (
@@ -111,6 +111,9 @@ export async function probeUrlMetadata(url: string): Promise<YtDlpMetadata> {
       'probe'
     )
     const meta = normalizeMetadata(raw, url)
+    if (meta.entries?.length && meta.entries.length > 1) {
+      meta.isCarousel = true
+    }
     validateMetadata(meta, url)
     return meta
   } catch (error) {

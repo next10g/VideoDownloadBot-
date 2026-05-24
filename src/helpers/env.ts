@@ -88,6 +88,10 @@ const env = cleanEnv(process.env, {
     default: 40,
     desc: 'Max images in one carousel/album ZIP download',
   }),
+  ALLOW_CAROUSEL: bool({
+    default: true,
+    desc: 'Allow social post carousels (Instagram/Facebook multi-image posts)',
+  }),
   SHOW_FORMAT_MENU: bool({
     default: true,
     desc: 'Show quality/type buttons before each download',

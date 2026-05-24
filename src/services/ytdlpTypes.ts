@@ -18,6 +18,7 @@ export interface YtDlpMetadata {
     width?: number
   }[]
   format?: string
+  isCarousel?: boolean
 }
 
 export type YtDlpFlags = Record<string, unknown>

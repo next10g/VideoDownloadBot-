@@ -145,6 +145,7 @@ export async function initYtdlpOptions(): Promise<void> {
 export function buildProbeFlags(sourceUrl?: string): YtDlpFlags {
   const socialCarousel =
     Boolean(
+      env.ALLOW_CAROUSEL &&
       sourceUrl &&
         (isInstagramUrl(sourceUrl) || isFacebookUrl(sourceUrl))
     )

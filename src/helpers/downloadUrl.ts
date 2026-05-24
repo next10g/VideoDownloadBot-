@@ -1,3 +1,4 @@
+import { createWriteStream } from 'fs'
 import { readFile, readdir, stat } from 'fs/promises'
 import { join } from 'path'
 import { DocumentType } from '@typegoose/typegoose'
@@ -50,6 +51,7 @@ import {
   probeSocialImageUrls,
 } from '@/helpers/socialCarousel'
 import { extractAlbumImageUrls } from '@/services/albumExtract'
+import { pipeZipArchive } from '@/helpers/createZipArchive'
 
 function escapeTitle(title: string | undefined): string {
   return (title || '').replace('<', '&lt;').replace('>', '&gt;')
@@ -113,6 +115,58 @@ async function assertFileWithinLimits(filePath: string): Promise<number> {
     )
   }
   return fileStat.size
+}
+
+const IMAGE_ONLY_FORMAT = 'best[ext=jpg]/best[ext=png]/best[ext=webp]/best'
+
+async function downloadCarouselEntriesFromInfo(
+  info: YtDlpMetadata,
+  jobDir: string,
+  jobId: string
+): Promise<string | undefined> {
+  const entries = info.entries || []
+  const urls = entries
+    .map((entry) => {
+      const row = entry as YtDlpMetadata & { webpage_url?: string; url?: string }
+      return row.webpage_url || row.url || ''
+    })
+    .filter(Boolean)
+    .slice(0, env.ALBUM_MAX_IMAGES)
+
+  if (urls.length === 0) {
+    return undefined
+  }
+
+  const albumFiles: string[] = []
+  for (let i = 0; i < urls.length; i++) {
+    const entryOutput = join(jobDir, `entry-${i}.%(ext)s`)
+    await runYtdlpDownload(
+      urls[i],
+      {
+        ...buildDownloadFlags(entryOutput.replace('.%(ext)s', ''), false, {
+          imageMode: true,
+          sourceUrl: urls[i],
+        }),
+        format: IMAGE_ONLY_FORMAT,
+        writeInfoJson: false,
+      },
+      env.DOWNLOAD_TIMEOUT_MS,
+      `entry-${i + 1}`
+    )
+    const resolved = await resolveDownloadedMediaPath(jobDir, `entry-${i}`, true)
+    albumFiles.push(resolved)
+  }
+
+  if (albumFiles.length === 1) {
+    return albumFiles[0]
+  }
+  const zipPath = join(jobDir, `album-${jobId}.zip`)
+  await pipeZipArchive(createWriteStream(zipPath), (archive) => {
+    albumFiles.forEach((file, i) => {
+      archive.file(file, { name: `image_${i + 1}.jpg` })
+    })
+  })
+  return zipPath
 }
 
 export default async function downloadUrl(
@@ -207,27 +261,50 @@ export default async function downloadUrl(
         ext: ext.replace('.', ''),
       }
     } else if (!filePath) {
-      ytdlpResult =
-        isYoutubeUrl(downloadJob.url) && !imageMode && !fileMode && !albumMode
-          ? await runYoutubeDownload(
-              downloadJob.url,
-              outputBase,
-              downloadJob.audio,
-              jobId,
-              env.DOWNLOAD_TIMEOUT_MS,
-              { maxHeight }
+      if (isYoutubeUrl(downloadJob.url) && !imageMode && !fileMode && !albumMode) {
+        ytdlpResult = await runYoutubeDownload(
+          downloadJob.url,
+          outputBase,
+          downloadJob.audio,
+          jobId,
+          env.DOWNLOAD_TIMEOUT_MS,
+          { maxHeight }
+        )
+      } else {
+        const targetUrl = isFacebookUrl(downloadJob.url)
+          ? sanitizeFacebookUrl(
+              await resolveFacebookUrl(downloadJob.url),
+              downloadJob.url
             )
-          : await runYtdlpDownload(
-              isFacebookUrl(downloadJob.url)
-                ? sanitizeFacebookUrl(
-                    await resolveFacebookUrl(downloadJob.url),
-                    downloadJob.url
-                  )
-                : downloadJob.url,
-              buildDownloadFlags(outputBase, downloadJob.audio, flagOpts),
+          : downloadJob.url
+        try {
+          ytdlpResult = await runYtdlpDownload(
+            targetUrl,
+            buildDownloadFlags(outputBase, downloadJob.audio, flagOpts),
+            env.DOWNLOAD_TIMEOUT_MS,
+            'download'
+          )
+        } catch (error) {
+          const detail = error instanceof Error ? error.message.toLowerCase() : ''
+          if (detail.includes('no video in this post')) {
+            ytdlpResult = await runYtdlpDownload(
+              targetUrl,
+              {
+                ...buildDownloadFlags(outputBase, false, {
+                  ...flagOpts,
+                  imageMode: true,
+                }),
+                format: IMAGE_ONLY_FORMAT,
+                writeInfoJson: true,
+              },
               env.DOWNLOAD_TIMEOUT_MS,
-              'download'
+              'download-images-fallback'
             )
+          } else {
+            throw error
+          }
+        }
+      }
 
       const entries = await readdir(jobDir)
       logger.info('download dir after yt-dlp', {
@@ -244,6 +321,23 @@ export default async function downloadUrl(
         } else if (isSocial && imageMode && albumUrls.length === 1) {
           filePath = join(jobDir, 'video.jpg')
           await fetchImageToFile(albumUrls[0], filePath)
+        } else if (info.entries?.length && info.entries.length > 1) {
+          const fromEntries = await downloadCarouselEntriesFromInfo(
+            info,
+            jobDir,
+            jobId
+          )
+          if (fromEntries) {
+            filePath = fromEntries
+          } else {
+            validateMetadata(info, downloadJob.url)
+            filePath = await resolveDownloadedPath(
+              info,
+              jobDir,
+              'video',
+              imageMode
+            )
+          }
         } else {
           validateMetadata(info, downloadJob.url)
           filePath = await resolveDownloadedPath(
