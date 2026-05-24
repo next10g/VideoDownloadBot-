@@ -132,6 +132,10 @@ export function facebookEmbedCandidates(
     }
   }
 
+  if (/\/share\//i.test(rawUrl)) {
+    push(normalizeUrl(rawUrl))
+  }
+
   push(clean)
   push(resolvedUrl)
   if (rawUrl !== resolvedUrl) {

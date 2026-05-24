@@ -8,6 +8,12 @@ import {
   type FacebookContentKind,
 } from '@/services/facebookLinkMeta'
 import {
+  hrefFromPluginTarget,
+  isFacebookShareLink,
+  shareEmbedHrefs,
+  sharePluginTargets,
+} from '@/services/facebookShareProbe'
+import {
   facebookUrlCandidatesFromId,
   fetchFacebookHtml,
   resolveFacebookUrl,
@@ -262,9 +268,10 @@ async function scrapeTargets(
         continue
       }
 
+      const hrefUsed = hrefFromPluginTarget(target) || resolvedUrl
       const patch: FacebookEmbedResult = {
         pageUrl,
-        resolvedUrl,
+        resolvedUrl: hrefUsed,
         title,
         description,
         streams,
@@ -278,14 +285,15 @@ async function scrapeTargets(
           target: target.slice(0, 120),
           streams: streams.length,
           kind,
+          resolvedUrl: hrefUsed,
         })
         return best
       }
 
-      if (imageUrl && kind === 'photo') {
+      if (imageUrl && (kind === 'photo' || kind === 'post')) {
         logger.info('facebook photo probe ok', {
           target: target.slice(0, 120),
-          resolvedUrl,
+          resolvedUrl: hrefUsed,
         })
         return best
       }
@@ -305,11 +313,47 @@ async function scrapeTargets(
   return null
 }
 
+/** Meta share links: plugins/post.php + video.php on raw share URL (before photo.php). */
+async function probeShareLinksFirst(
+  rawUrl: string,
+  resolvedUrl: string | undefined,
+  timeoutMs: number
+): Promise<FacebookEmbedResult | null> {
+  const hrefs = shareEmbedHrefs(rawUrl, resolvedUrl)
+  const targets = sharePluginTargets(hrefs)
+  const perTargetMs = Math.min(8_000, Math.max(4_000, Math.floor(timeoutMs / targets.length)))
+  const resolved = resolvedUrl || hrefs[0]
+
+  const result = await scrapeTargets(
+    targets,
+    perTargetMs,
+    rawUrl,
+    resolved,
+    'post'
+  )
+  if (result?.imageUrl || (result && result.streams.length > 0)) {
+    logger.info('facebook share probe ok', {
+      from: rawUrl.slice(0, 90),
+      resolvedUrl: result.resolvedUrl,
+      hasImage: Boolean(result.imageUrl),
+      streams: result.streams.length,
+    })
+  }
+  return result
+}
+
 async function probePhotoPaths(
   rawUrl: string,
   resolvedUrl: string,
   perTargetMs: number
 ): Promise<FacebookEmbedResult | null> {
+  if (isFacebookShareLink(rawUrl)) {
+    const share = await probeShareLinksFirst(rawUrl, resolvedUrl, perTargetMs * 3)
+    if (share) {
+      return share
+    }
+  }
+
   const photoHrefs = facebookPhotoCandidates(rawUrl, resolvedUrl)
   const hrefs =
     photoHrefs.length > 0
@@ -333,6 +377,13 @@ async function probeVideoPaths(
   resolvedUrl: string,
   perTargetMs: number
 ): Promise<FacebookEmbedResult | null> {
+  if (isFacebookShareLink(rawUrl)) {
+    const share = await probeShareLinksFirst(rawUrl, resolvedUrl, perTargetMs * 3)
+    if (share?.streams.length) {
+      return share
+    }
+  }
+
   const hrefs = facebookVideoCandidates(rawUrl, resolvedUrl)
   const targets: string[] = []
   for (const href of hrefs.slice(0, 3)) {
@@ -348,17 +399,40 @@ async function probeVideoPaths(
   )
 }
 
-/** Cookie-less Facebook: post/video plugins only (no oEmbed, no yt-dlp). */
+/** Cookie-less Facebook: share → embed plugins → page HTML (no oEmbed). */
 export async function probeFacebookEmbed(
   rawUrl: string,
   timeoutMs = 20_000
 ): Promise<FacebookEmbedResult | null> {
+  const shareLink = isFacebookShareLink(rawUrl)
+  const shareBudget = shareLink ? Math.min(12_000, Math.floor(timeoutMs * 0.55)) : 0
+
+  if (shareLink) {
+    const instant = await probeShareLinksFirst(rawUrl, undefined, shareBudget)
+    if (instant) {
+      return instant
+    }
+  }
+
   const resolvedRaw = await resolveFacebookUrl(rawUrl)
   const resolvedUrl = sanitizeFacebookUrl(resolvedRaw, rawUrl)
+
+  if (shareLink) {
+    const afterResolve = await probeShareLinksFirst(
+      rawUrl,
+      resolvedUrl,
+      Math.max(8_000, shareBudget)
+    )
+    if (afterResolve) {
+      return afterResolve
+    }
+  }
+
   const meta = parseFacebookLinkMeta(resolvedUrl)
   const perTargetMs = Math.min(7_000, Math.max(4_000, Math.floor(timeoutMs / 3)))
 
   const tryPhotoFirst =
+    shareLink ||
     meta.kind === 'photo' ||
     meta.kind === 'post' ||
     /\/share\/p\//i.test(rawUrl) ||
@@ -383,7 +457,23 @@ export async function probeFacebookEmbed(
     return probePhotoPaths(rawUrl, resolvedUrl, perTargetMs)
   }
 
+  if (shareLink) {
+    return probeShareLinksFirst(rawUrl, resolvedUrl, perTargetMs * 4)
+  }
+
   return null
+}
+
+/** Last resort for share/p when photo.php path failed. */
+export async function probeFacebookShareFallback(
+  rawUrl: string,
+  resolvedUrl: string,
+  timeoutMs: number
+): Promise<FacebookEmbedResult | null> {
+  if (!isFacebookShareLink(rawUrl)) {
+    return null
+  }
+  return probeShareLinksFirst(rawUrl, resolvedUrl, timeoutMs)
 }
 
 export function pickFacebookStream(

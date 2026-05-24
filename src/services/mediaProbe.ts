@@ -5,8 +5,10 @@ import { ValidationError } from '@/lib/errors'
 import {
   probeFacebookByContentId,
   probeFacebookEmbed,
+  probeFacebookShareFallback,
   type FacebookEmbedResult,
 } from '@/services/facebookEmbed'
+import { isFacebookShareLink } from '@/services/facebookShareProbe'
 import {
   parseFacebookLinkMeta,
   sanitizeFacebookUrl,
@@ -88,7 +90,10 @@ function heightsFromYtdlp(meta: YtDlpMetadata): {
   }
 }
 
-function offerFromFacebook(embed: FacebookEmbedResult): MediaFormatOffer {
+function offerFromFacebook(
+  embed: FacebookEmbedResult,
+  rawUrl?: string
+): MediaFormatOffer {
   const heights = embed.streams.map((s) => s.height).filter((h) => h > 0)
   const unique = [...new Set(heights)].sort((a, b) => b - a)
   return {
@@ -98,7 +103,7 @@ function offerFromFacebook(embed: FacebookEmbedResult): MediaFormatOffer {
     hasImage: Boolean(embed.imageUrl),
     hasAudio: unique.length > 0,
     facebook: embed,
-    downloadUrl: embed.resolvedUrl,
+    downloadUrl: embed.resolvedUrl || rawUrl,
   }
 }
 
@@ -154,7 +159,7 @@ export async function probeMediaOffer(url: string): Promise<MediaFormatOffer> {
     const downloadUrl = sanitizeFacebookUrl(await resolveFacebookUrl(url), url)
     const embed = await probeFacebookEmbed(url, FACEBOOK_PROBE_MS)
     if (embed && (embed.streams.length > 0 || embed.imageUrl)) {
-      return offerFromFacebook(embed)
+      return offerFromFacebook(embed, url)
     }
 
     const photoOrPost = isFacebookPhotoOrPost(url, downloadUrl)
@@ -166,6 +171,17 @@ export async function probeMediaOffer(url: string): Promise<MediaFormatOffer> {
     })
 
     if (isStrictFacebookPhotoOnly(downloadUrl, url)) {
+      if (isFacebookShareLink(url)) {
+        const shareRetry = await probeFacebookShareFallback(
+          url,
+          downloadUrl,
+          14_000
+        )
+        if (shareRetry) {
+          logger.info('facebook share fallback ok', { url })
+          return offerFromFacebook(shareRetry, url)
+        }
+      }
       throw new ValidationError(
         'Facebook photo could not be loaded from this server (public posts only)',
         'facebook_failed'
@@ -185,7 +201,7 @@ export async function probeMediaOffer(url: string): Promise<MediaFormatOffer> {
         )
         if (byId) {
           logger.info('facebook probe ok via content id', { contentId })
-          return offerFromFacebook(byId)
+          return offerFromFacebook(byId, url)
         }
       }
       throw new ValidationError(
