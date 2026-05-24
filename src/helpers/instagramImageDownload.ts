@@ -2,12 +2,12 @@ import { readFile, readdir } from 'fs/promises'
 import { join } from 'path'
 import { fetchImageToFile } from '@/helpers/fetchImageToFile'
 import { collectImageUrlsFromInfo } from '@/helpers/extractImageUrlsFromInfo'
+import { scrapeAllInstagramImages } from '@/helpers/instagramScrape'
 import {
   normalizeMediaUrl,
   upscaleInstagramCdnUrl,
 } from '@/helpers/normalizeMediaUrl'
 import { isInstagramUrl } from '@/helpers/instagramUrl'
-import { resolveDownloadedMediaPath } from '@/helpers/resolveDownloadedFile'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
 import { buildDownloadFlags, SOCIAL_IMAGE_FORMAT } from '@/services/ytdlpOptions'
@@ -20,16 +20,27 @@ const IG_ANDROID_UA =
 const IG_DESKTOP_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 
-async function readInfoJson(
-  jobDir: string,
-  fileBase: string
-): Promise<YtDlpMetadata | undefined> {
-  try {
-    const raw = await readFile(join(jobDir, `${fileBase}.info.json`), 'utf8')
-    return JSON.parse(raw) as YtDlpMetadata
-  } catch {
-    return undefined
+async function readPostInfoJson(jobDir: string): Promise<YtDlpMetadata | undefined> {
+  const names = (await readdir(jobDir))
+    .filter((n) => n.endsWith('.info.json'))
+    .sort()
+  let best: YtDlpMetadata | undefined
+  for (const name of names) {
+    try {
+      const parsed = JSON.parse(
+        await readFile(join(jobDir, name), 'utf8')
+      ) as YtDlpMetadata
+      if (parsed.entries && parsed.entries.length > 1) {
+        return parsed
+      }
+      if (!best) {
+        best = parsed
+      }
+    } catch {
+      // skip invalid json
+    }
   }
+  return best
 }
 
 async function listImageFiles(jobDir: string): Promise<string[]> {
@@ -41,7 +52,7 @@ async function listImageFiles(jobDir: string): Promise<string[]> {
         !n.endsWith('.info.json') &&
         !n.startsWith('tg-')
     )
-    .sort()
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
     .map((n) => join(jobDir, n))
 }
 
@@ -51,8 +62,8 @@ async function fetchCdnImage(
   dest: string
 ): Promise<string> {
   const candidates = [
-    normalizeMediaUrl(imageUrl),
     upscaleInstagramCdnUrl(imageUrl),
+    normalizeMediaUrl(imageUrl),
   ]
   const headerSets = [
     { referer: postUrl, userAgent: IG_ANDROID_UA },
@@ -72,12 +83,32 @@ async function fetchCdnImage(
   throw lastError ?? new Error('fetch failed')
 }
 
+async function fetchUrlsToDir(
+  urls: string[],
+  postUrl: string,
+  jobDir: string
+): Promise<string[]> {
+  const paths: string[] = []
+  for (let i = 0; i < urls.length; i++) {
+    const dest = join(jobDir, `slide${i + 1}.jpg`)
+    try {
+      paths.push(await fetchCdnImage(urls[i], postUrl, dest))
+    } catch (error) {
+      logger.warn('instagram slide fetch skip', {
+        index: i,
+        detail: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+  return paths
+}
+
 async function downloadViaYtdlpPost(
   postUrl: string,
   jobDir: string,
   label: string
 ): Promise<string[]> {
-  const outputBase = join(jobDir, 'video')
+  const outputBase = join(jobDir, 'slide')
   await runYtdlpDownload(
     postUrl,
     {
@@ -87,54 +118,68 @@ async function downloadViaYtdlpPost(
       }),
       format: SOCIAL_IMAGE_FORMAT,
       writeInfoJson: true,
+      output: `${outputBase}.%(playlist_index)02d.%(ext)s`,
     },
     env.DOWNLOAD_TIMEOUT_MS,
     label
   )
+
+  const info = await readPostInfoJson(jobDir)
+  const metaUrls = info
+    ? await collectImageUrlsFromInfo(info, postUrl)
+    : []
+  if (metaUrls.length > 0) {
+    const fetched = await fetchUrlsToDir(
+      metaUrls.slice(0, env.ALBUM_MAX_IMAGES),
+      postUrl,
+      jobDir
+    )
+    if (fetched.length > 0) {
+      return fetched
+    }
+  }
 
   const onDisk = await listImageFiles(jobDir)
   if (onDisk.length > 0) {
     return onDisk
   }
 
-  const info = await readInfoJson(jobDir, 'video')
-  if (!info) {
-    return []
-  }
-
-  const urls = await collectImageUrlsFromInfo(info, postUrl)
-  const paths: string[] = []
-  for (let i = 0; i < urls.length; i++) {
-    const dest = join(jobDir, `meta${i + 1}.jpg`)
-    try {
-      paths.push(await fetchCdnImage(urls[i], postUrl, dest))
-    } catch (error) {
-      logger.warn('instagram metadata image skip', {
-        index: i,
-        detail: error instanceof Error ? error.message : String(error),
-      })
-    }
-  }
-  return paths
+  return []
 }
 
-/** Download IG photo(s) via yt-dlp on the post URL (not hotlinked CDN). */
+/** Download IG photo(s) via yt-dlp + full-res CDN fetch. */
 export async function downloadInstagramPostImages(
   postUrl: string,
-  jobDir: string
+  jobDir: string,
+  expectCarousel = false
 ): Promise<string[]> {
-  const paths = await downloadViaYtdlpPost(postUrl, jobDir, 'ig-post')
+  let paths = await downloadViaYtdlpPost(postUrl, jobDir, 'ig-post')
+
+  if (paths.length <= 1 && (expectCarousel || paths.length === 0)) {
+    const scraped = await scrapeAllInstagramImages(postUrl)
+    if (scraped.length > paths.length) {
+      const fetched = await fetchUrlsToDir(
+        scraped.slice(0, env.ALBUM_MAX_IMAGES),
+        postUrl,
+        jobDir
+      )
+      if (fetched.length > paths.length) {
+        paths = fetched
+      }
+    }
+  }
+
   if (paths.length > 0) {
     logger.info('instagram post download ok', {
       postUrl,
       count: paths.length,
+      carousel: paths.length > 1,
     })
     return paths
   }
   throw new Error('Instagram post produced no images')
 }
 
-/** Try post yt-dlp first; optional CDN URL only for direct fetch (never yt-dlp generic on CDN). */
 export async function downloadInstagramCdnImage(
   imageUrl: string,
   postUrl: string,
@@ -142,25 +187,11 @@ export async function downloadInstagramCdnImage(
   jobDir: string,
   _fileBase: string
 ): Promise<string> {
-  try {
-    const fromPost = await downloadViaYtdlpPost(postUrl, jobDir, 'ig-post-single')
-    if (fromPost.length > 0) {
-      return fromPost[0]
-    }
-  } catch (error) {
-    logger.warn('instagram post ytdlp failed, trying cdn fetch', {
-      postUrl,
-      detail: error instanceof Error ? error.message : String(error),
-    })
+  const paths = await downloadInstagramPostImages(postUrl, jobDir, false)
+  if (paths.length > 0) {
+    return paths[0]
   }
-
-  try {
-    return await fetchCdnImage(imageUrl, postUrl, dest)
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    logger.info('instagram cdn fetch failed', { postUrl, status: detail })
-    throw error
-  }
+  return fetchCdnImage(imageUrl, postUrl, dest)
 }
 
 export function shouldUseInstagramDownloaders(url: string): boolean {

@@ -296,17 +296,28 @@ export default async function downloadUrl(
     const isSocial = isSocialCarouselUrl(downloadJob.url)
 
     if (albumMode && downloadJob.albumUrls?.length) {
-      if (downloadJob.albumUrls.length === 1) {
+      if (shouldUseInstagramDownloaders(downloadJob.url)) {
+        const rawPaths = await downloadInstagramPostImages(
+          downloadJob.url,
+          jobDir,
+          true
+        )
+        const prepared = await Promise.all(
+          rawPaths.map((p) => prepareTelegramPhoto(p, jobDir))
+        )
+        if (prepared.length > 1) {
+          photoPaths = prepared
+          info = { title: 'Album' } as YtDlpMetadata
+        } else if (prepared.length === 1) {
+          filePath = prepared[0]
+          info = { title: 'Photo', ext: 'jpg' } as YtDlpMetadata
+        }
+      } else if (downloadJob.albumUrls.length === 1) {
         const dest = join(jobDir, 'video.jpg')
-        const downloaded = shouldUseInstagramDownloaders(downloadJob.url)
-          ? await downloadInstagramCdnImage(
-              downloadJob.albumUrls[0],
-              downloadJob.url,
-              dest,
-              jobDir,
-              'video'
-            )
-          : await fetchImageToFile(downloadJob.albumUrls![0], dest)
+        const downloaded = await fetchImageToFile(
+          downloadJob.albumUrls[0],
+          dest
+        )
         filePath = await prepareTelegramPhoto(downloaded, jobDir)
         info = { title: 'Photo', ext: 'jpg' } as YtDlpMetadata
       } else {
@@ -324,7 +335,8 @@ export default async function downloadUrl(
         try {
           const rawPaths = await downloadInstagramPostImages(
             downloadJob.url,
-            jobDir
+            jobDir,
+            albumMode
           )
           const prepared = await Promise.all(
             rawPaths.map((p) => prepareTelegramPhoto(p, jobDir))

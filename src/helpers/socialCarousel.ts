@@ -83,3 +83,26 @@ export async function probeSocialImageUrls(url: string): Promise<string[]> {
 
   return []
 }
+
+/** Scrape + yt-dlp metadata — best effort carousel URL list for probe/menu. */
+export async function probeInstagramImageUrls(url: string): Promise<string[]> {
+  let urls = await probeSocialImageUrls(url)
+  if (urls.length > 1) {
+    return urls
+  }
+  try {
+    const meta = (await runYtdlpJson(
+      url,
+      { ...buildProbeFlags(url), ignoreNoFormatsError: true },
+      probeTimeoutMs(url),
+      'ig-image-probe'
+    )) as YtDlpMetadata
+    const fromMeta = extractAlbumImageUrls(meta)
+    if (fromMeta.length > urls.length) {
+      urls = fromMeta
+    }
+  } catch {
+    // scrape-only
+  }
+  return urls
+}

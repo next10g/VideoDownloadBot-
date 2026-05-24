@@ -7,10 +7,10 @@ export function normalizeMediaUrl(url: string): string {
     .replace(/\\\//g, '/')
 }
 
-/** Prefer larger Instagram CDN variant when URL embeds a small stp size. */
+/** Prefer full-frame Instagram CDN URL (drop crop box + tiny stp size). */
 export function upscaleInstagramCdnUrl(url: string): string {
   let u = normalizeMediaUrl(url)
-  u = u.replace(/_s\d+x\d+_/g, '_s1080x1080_')
-  u = u.replace(/stp=[^&]+&/, 'stp=dst-jpg&')
+  u = u.replace(/stp=c[^&]*&/i, 'stp=dst-jpg&')
+  u = u.replace(/_s\d+x\d+[^/&]*/gi, 's1080x1080')
   return u
 }

@@ -31,13 +31,53 @@ function collectDisplayUrls(html: string, start: number, maxLen: number): string
   return urls
 }
 
-/** Carousel slides only (edge_sidecar_to_children block). */
-function extractSidecarDisplayUrls(html: string): string[] {
-  const idx = html.indexOf('edge_sidecar_to_children')
-  if (idx < 0) {
-    return []
+const CAROUSEL_MARKERS = [
+  'edge_sidecar_to_children',
+  'carousel_media',
+  'XDTGraphSidecar',
+  'sidecar_child',
+]
+
+/** Highest-width candidate per slide (full resolution, not 640 crop). */
+function extractHighResCandidates(html: string): string[] {
+  const slides: string[] = []
+  const parts = html.split('"image_versions2"')
+  for (let i = 1; i < parts.length; i++) {
+    const section = parts[i].slice(0, 20_000)
+    let bestW = 0
+    let bestUrl = ''
+    const re = /"width":(\d+)[^}]*"url":"([^"]+)"/g
+    let match: RegExpExecArray | null
+    while ((match = re.exec(section))) {
+      const w = Number(match[1])
+      if (w >= bestW) {
+        bestW = w
+        bestUrl = decodeJsonUrl(match[2])
+      }
+    }
+    if (bestUrl.startsWith('http')) {
+      slides.push(normalizeMediaUrl(bestUrl))
+    }
   }
-  return collectDisplayUrls(html, idx, 400_000)
+  return slides
+}
+
+/** Carousel slides from sidecar / carousel blocks in embed HTML. */
+function extractSidecarDisplayUrls(html: string): string[] {
+  for (const marker of CAROUSEL_MARKERS) {
+    const idx = html.indexOf(marker)
+    if (idx >= 0) {
+      const urls = collectDisplayUrls(html, idx, 500_000)
+      if (urls.length > 1) {
+        return urls
+      }
+    }
+  }
+  const hiRes = extractHighResCandidates(html)
+  if (hiRes.length > 1) {
+    return hiRes
+  }
+  return []
 }
 
 /** Single photo post — one display_url from the main media node. */
@@ -119,6 +159,13 @@ function parsePostImages(html: string): string[] {
   const sidecar = extractSidecarDisplayUrls(html)
   if (sidecar.length > 0) {
     return sidecar
+  }
+  const hiRes = extractHighResCandidates(html)
+  if (hiRes.length === 1) {
+    return hiRes
+  }
+  if (hiRes.length > 1) {
+    return hiRes
   }
   return extractSinglePostDisplayUrl(html)
 }

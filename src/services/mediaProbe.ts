@@ -180,8 +180,8 @@ async function probeYtdlp(url: string): Promise<MediaFormatOffer> {
       isInstagramUrl(url) &&
       detail.toLowerCase().includes('no video in this post')
     ) {
-      const { probeSocialImageUrls } = await import('@/helpers/socialCarousel')
-      const albumUrls = await probeSocialImageUrls(url)
+      const { probeInstagramImageUrls } = await import('@/helpers/socialCarousel')
+      const albumUrls = await probeInstagramImageUrls(url)
       if (albumUrls.length > 0) {
         return {
           title: 'Instagram',
@@ -400,8 +400,8 @@ export async function probeMediaOffer(url: string): Promise<MediaFormatOffer> {
   if (isInstagramUrl(url)) {
     logger.info('instagram probe', { url })
     if (!isInstagramReelUrl(url)) {
-      const { probeSocialImageUrls } = await import('@/helpers/socialCarousel')
-      const albumUrls = await probeSocialImageUrls(url)
+      const { probeInstagramImageUrls } = await import('@/helpers/socialCarousel')
+      const albumUrls = await probeInstagramImageUrls(url)
       if (albumUrls.length > 0) {
         return {
           title: 'Instagram',
