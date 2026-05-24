@@ -42,6 +42,14 @@ export function buildFormatKeyboardFromProbe(
     kb.row()
   }
 
+  if (probe.hasAlbum && probe.albumUrls.length > 1) {
+    kb.text(
+      ctx.i18n.t('btn_format_album', { count: String(probe.albumUrls.length) }),
+      'fmt:alb'
+    )
+    kb.row()
+  }
+
   if (probe.hasImage) {
     if (imageSizes.length > 1) {
       for (const size of imageSizes.slice(0, 4)) {
@@ -62,7 +70,12 @@ export function buildFormatKeyboardFromProbe(
     kb.row()
   }
 
-  if (heights.length === 0 && !probe.hasImage && !probe.hasAudio) {
+  if (probe.isFile) {
+    kb.text(ctx.i18n.t('btn_format_file'), 'fmt:f')
+    kb.row()
+  }
+
+  if (heights.length === 0 && !probe.hasImage && !probe.hasAudio && !probe.isFile) {
     kb.text(ctx.i18n.t('btn_format_video', { height: '720' }), 'fmt:v:720')
     kb.row()
     kb.text(ctx.i18n.t('btn_format_audio'), 'fmt:a')
@@ -85,8 +98,14 @@ export function parseFormatCallback(data: string): FormatChoice | undefined {
       preferredExt: audioExt[1],
     }
   }
+  if (data === 'fmt:alb') {
+    return { mode: DownloadMode.album, maxHeight: 0 }
+  }
   if (data === 'fmt:i') {
     return { mode: DownloadMode.image, maxHeight: 0 }
+  }
+  if (data === 'fmt:f') {
+    return { mode: DownloadMode.file, maxHeight: 0 }
   }
   const image = /^fmt:i:(\d+)$/.exec(data)
   if (image) {

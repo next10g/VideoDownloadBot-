@@ -49,6 +49,9 @@ export default class DownloadJob extends FindOrCreate {
   @prop()
   directStreamUrl?: string
 
+  @prop({ type: () => [String] })
+  albumUrls?: string[]
+
   @prop({
     required: true,
     index: true,

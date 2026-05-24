@@ -53,6 +53,22 @@ export class Chat extends FindOrCreate {
   @prop({ default: 0 })
   referralCount!: number
 
+  @prop()
+  phoneNumber?: string
+
+  @prop({ default: 0 })
+  totalBytesDownloaded!: number
+
+  @prop({ default: 0 })
+  successDownloadCount!: number
+
+  /** e.g. video: 5, image: 2, file: 1 */
+  @prop({ type: () => Object, default: {} })
+  fileTypeCounts!: Record<string, number>
+
+  @prop()
+  profilePhotoFileId?: string
+
   /** URL awaiting format selection (callback_data is too short for full URLs). */
   @prop()
   pendingUrl?: string

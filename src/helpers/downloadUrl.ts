@@ -39,6 +39,10 @@ import {
   isYoutubeCookiesInvalid,
 } from '@/services/ytdlpCookies'
 import { validateMetadata } from '@/services/ytdlpProbe'
+import { downloadAlbumAsZip } from '@/helpers/downloadAlbumZip'
+import { isInstagramUrl } from '@/helpers/instagramUrl'
+import { recordUserDownload } from '@/helpers/userDownloadStats'
+import { saveUserLink } from '@/helpers/userLibrary'
 
 function escapeTitle(title: string | undefined): string {
   return (title || '').replace('<', '&lt;').replace('>', '&gt;')
@@ -178,14 +182,18 @@ export default async function downloadUrl(
     const jobId = String(downloadJob.id)
 
     const imageMode = downloadJob.downloadMode === DownloadMode.image
+    const albumMode = downloadJob.downloadMode === DownloadMode.album
+    const fileMode = downloadJob.downloadMode === DownloadMode.file
     const maxHeight =
       downloadJob.maxHeight > 0 ? downloadJob.maxHeight : env.YOUTUBE_MAX_HEIGHT
     const flagOpts = {
       maxHeight,
-      imageMode,
+      imageMode: imageMode || albumMode,
+      fileMode,
       sourceUrl: downloadJob.url,
       preferredAudioExt: downloadJob.preferredExt || undefined,
     }
+    const plainCaption = isInstagramUrl(downloadJob.url)
 
     logger.info('download start', {
       url: downloadJob.url,
@@ -199,6 +207,13 @@ export default async function downloadUrl(
     let filePath: string
     let info: YtDlpMetadata | undefined
     let ytdlpResult = { stderr: '' }
+
+    if (albumMode && downloadJob.albumUrls?.length) {
+      filePath = await downloadAlbumAsZip(downloadJob.albumUrls, jobId)
+      info = { title: 'Album' } as YtDlpMetadata
+    } else {
+      filePath = ''
+    }
 
     let directUrl = downloadJob.directStreamUrl
 
@@ -217,7 +232,7 @@ export default async function downloadUrl(
       }
     }
 
-    if (directUrl) {
+    if (!filePath && directUrl) {
       const ext = imageMode ? '.jpg' : '.mp4'
       filePath = join(jobDir, `video${ext}`)
       logger.info('facebook direct download', { jobId, ext })
@@ -230,9 +245,9 @@ export default async function downloadUrl(
         title: 'Facebook',
         ext: ext.replace('.', ''),
       }
-    } else {
+    } else if (!filePath) {
       ytdlpResult =
-        isYoutubeUrl(downloadJob.url) && !imageMode
+        isYoutubeUrl(downloadJob.url) && !imageMode && !fileMode && !albumMode
           ? await runYoutubeDownload(
               downloadJob.url,
               outputBase,
@@ -283,11 +298,10 @@ export default async function downloadUrl(
     const fileSize = await assertFileWithinLimits(filePath)
     const description =
       typeof info?.description === 'string' ? info.description.trim() : ''
-    const escapedTitle = escapeTitle(
-      [info?.title, imageMode && description ? description : '']
-        .filter(Boolean)
-        .join('\n\n')
-    )
+    const titleRaw = [info?.title, imageMode && description ? description : '']
+      .filter(Boolean)
+      .join('\n\n')
+    const escapedTitle = plainCaption ? titleRaw : escapeTitle(titleRaw)
 
     downloadJob.status = DownloadJobStatus.uploading
     await saveDownloadJob(downloadJob, 'uploading')
@@ -297,7 +311,9 @@ export default async function downloadUrl(
     )
     const media: SendMediaOptions = {
       audio: downloadJob.audio,
-      downloadMode: downloadJob.downloadMode,
+      downloadMode: albumMode ? DownloadMode.file : downloadJob.downloadMode,
+      plainCaption,
+      sourceUrl: downloadJob.url,
     }
     const thumbPath =
       downloadJob.audio ||
@@ -347,6 +363,16 @@ export default async function downloadUrl(
     downloadJob.status = DownloadJobStatus.finished
     await saveDownloadJob(downloadJob, 'finished')
     await markLinkLogResult(downloadJob.originalChatId, downloadJob.url, true)
+    await recordUserDownload(
+      downloadJob.originalChatId,
+      fileSize,
+      downloadJob.downloadMode
+    )
+    await saveUserLink(downloadJob.originalChatId, downloadJob.url, {
+      title: titleRaw,
+      downloadMode: downloadJob.downloadMode,
+      bytes: fileSize,
+    })
     logger.info('download finished', { url: downloadJob.url, jobId: downloadJob.id })
   } catch (error) {
     metrics.increment('failedDownloads')

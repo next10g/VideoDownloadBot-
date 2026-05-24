@@ -12,6 +12,10 @@ const PUBLIC_COMMANDS = [
   { command: 'help', description: 'المساعدة' },
   { command: 'language', description: 'اللغة' },
   { command: 'refer', description: 'دعوة الأصدقاء' },
+  { command: 'mylinks', description: 'روابطك المحفوظة' },
+  { command: 'statsme', description: 'إحصائياتك' },
+  { command: 'sticker', description: 'صورة → ستيكر' },
+  { command: 'zip', description: 'ضغط صور ZIP' },
 ] as const
 
 /** Admin-only — registered for your chat id only (hidden from other users). */

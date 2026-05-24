@@ -1,15 +1,20 @@
 import Context from '@/models/Context'
 import { logSubmittedLink } from '@/helpers/logUserLink'
+import { collectPhotoForZip } from '@/helpers/zipBatch'
 import sendCompletedFile from '@/helpers/sendCompletedFile'
 import { DownloadMode } from '@/models/DownloadMode'
 import report from '@/helpers/report'
 import { recordDownloadSuccess } from '@/helpers/userAbuse'
 
-/** Re-send Telegram photos with caption (no external URL). */
+/** Re-send Telegram photos with caption (no external URL). Album → ZIP. */
 export default async function handlePhoto(ctx: Context) {
   const photos = ctx.message?.photo
   if (!photos?.length || !ctx.from) {
     return
+  }
+
+  if (ctx.message?.media_group_id) {
+    return collectPhotoForZip(ctx)
   }
   const largest = photos[photos.length - 1]
   const caption = ctx.message?.caption?.trim() || ''

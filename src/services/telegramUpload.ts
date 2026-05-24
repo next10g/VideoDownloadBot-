@@ -5,9 +5,11 @@ import { Message } from '@grammyjs/types'
 import bot from '@/helpers/bot'
 import env from '@/helpers/env'
 import {
+  isDocumentMode,
   isImageMode,
   type SendMediaOptions,
 } from '@/helpers/sendMediaOptions'
+import { isInstagramUrl } from '@/helpers/instagramUrl'
 import i18n from '@/helpers/i18n'
 import logger from '@/lib/logger'
 import { metrics } from '@/lib/metrics'
@@ -126,7 +128,8 @@ export default async function sendCompletedFile(
     title,
     media,
     thumb,
-    fileStats
+    fileStats,
+    media.sourceUrl
   )
 
   const botToSend = videoUploadBot
@@ -188,7 +191,8 @@ async function sendCachedFileId(
     title,
     media,
     thumb,
-    fileStats
+    fileStats,
+    media.sourceUrl
   )
   try {
     if (isImageMode(media)) {
@@ -210,19 +214,23 @@ function buildCaptionConfig(
   title: string,
   media: SendMediaOptions,
   thumb?: InputFile | string,
-  fileStats?: MediaFileStats
+  fileStats?: MediaFileStats,
+  sourceUrl?: string
 ) {
-  const safeTitle = (title || '').replace('<', '&lt;').replace('>', '&gt;')
   const statsLine = fileStats ? buildFileStatsLine(fileStats) : ''
-  const captionBody = statsLine
-    ? `${safeTitle}\n\n${statsLine}`
-    : safeTitle
+  const captionBody = [title, statsLine].filter(Boolean).join('\n\n')
+  const plain =
+    media.plainCaption ||
+    (sourceUrl ? isInstagramUrl(sourceUrl) : false)
+
   return {
-    caption: i18n.t(language, 'video_caption', {
-      bot: bot.botInfo.username,
-      title: captionBody,
-    }),
-    parse_mode: 'HTML' as const,
+    caption: plain
+      ? captionBody || title
+      : i18n.t(language, 'video_caption', {
+          bot: bot.botInfo.username,
+          title: captionBody || title,
+        }),
+    parse_mode: plain ? undefined : ('HTML' as const),
     reply_to_message_id: messageId,
     thumb:
       media.audio || isImageMode(media)
@@ -249,6 +257,9 @@ async function sendOnce(
   | Message.PhotoMessage
 > {
   try {
+    if (isDocumentMode(media)) {
+      return botToSend.api.sendDocument(chatId, file, config)
+    }
     if (isImageMode(media)) {
       return botToSend.api.sendPhoto(chatId, file, config)
     }

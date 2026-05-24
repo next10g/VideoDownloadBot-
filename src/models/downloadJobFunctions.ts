@@ -7,6 +7,7 @@ export interface DownloadJobOptions {
   maxHeight?: number
   preferredExt?: string
   directStreamUrl?: string
+  albumUrls?: string[]
 }
 
 export function findOrCreateDownloadJob(
@@ -30,6 +31,7 @@ export function findOrCreateDownloadJob(
       maxHeight,
       preferredExt,
       directStreamUrl: options.directStreamUrl,
+      albumUrls: options.albumUrls,
     }
   )
 }

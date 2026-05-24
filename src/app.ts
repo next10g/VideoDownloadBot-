@@ -34,6 +34,11 @@ import handleUrl from '@/handlers/url'
 import handleStart from '@/handlers/start'
 import handlePhoto from '@/handlers/photo'
 import handleRefer from '@/handlers/refer'
+import handleMyLinks from '@/handlers/mylinks'
+import handleStatsMe from '@/handlers/statsme'
+import handleSticker from '@/handlers/sticker'
+import handleContact from '@/handlers/contact'
+import handleZipCommand from '@/handlers/zip'
 import { handleAdminStats } from '@/handlers/admin'
 import {
   handleRetryDownload,
@@ -109,6 +114,10 @@ async function runApp() {
   bot.command('auto', handleAutoMode)
   bot.command('video', handleVideoMode)
   bot.command('refer', handleRefer)
+  bot.command('mylinks', handleMyLinks)
+  bot.command('statsme', handleStatsMe)
+  bot.command('sticker', handleSticker)
+  bot.command('zip', handleZipCommand)
   bot.command('stats', handleAdminStats)
   bot.command('users', handleAdminUsers)
   bot.command('admin', handleAdminPanel)
@@ -124,6 +133,7 @@ async function runApp() {
     return handleLanguage(ctx)
   })
   bot.on('message:photo', handlePhoto)
+  bot.on('message:contact', handleContact)
   bot.hears(
     /https?:\/\/[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&/=]*)/i,
     handleUrl

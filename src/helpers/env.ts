@@ -73,7 +73,10 @@ const env = cleanEnv(process.env, {
     desc: 'Optional Invidious API bases (comma-separated). Empty = built-in list',
   }),
   PIPED_API_TIMEOUT_MS: num({ default: 45_000 }),
-  YOUTUBE_MAX_HEIGHT: num({ default: 1080 }),
+  YOUTUBE_MAX_HEIGHT: num({
+    default: 15360,
+    desc: 'Max video height cap (up to 16K when source provides it)',
+  }),
   SHOW_FORMAT_MENU: bool({
     default: true,
     desc: 'Show quality/type buttons before each download',

@@ -53,6 +53,8 @@ export async function handleFormatChoice(ctx: Context) {
       preferredExt: parsed.preferredExt,
       audio: parsed.mode === DownloadMode.audio,
       directStreamUrl,
+      albumUrls:
+        parsed.mode === DownloadMode.album ? probe?.albumUrls : undefined,
     })
   } catch (error) {
     report(error, { ctx, location: 'handleFormatChoice' })
@@ -70,7 +72,6 @@ export async function handleShareBot(ctx: Context) {
     ctx.i18n.t('refer_share', {
       link,
       bot: bot.botInfo.username,
-    }),
-    { parse_mode: 'HTML' }
+    })
   )
 }

@@ -42,6 +42,7 @@ export interface DownloadRequestOptions extends DownloadJobOptions {
   downloadMode: DownloadMode
   maxHeight: number
   preferredExt?: string
+  albumUrls?: string[]
 }
 
 export default async function createDownloadJobAndRequest(
@@ -157,6 +158,7 @@ export default async function createDownloadJobAndRequest(
         maxHeight: requestOpts.maxHeight,
         preferredExt: requestOpts.preferredExt,
         directStreamUrl: requestOpts.directStreamUrl,
+        albumUrls: requestOpts.albumUrls,
       },
       ctx.dbchat.telegramId,
       statusMsg.message_id

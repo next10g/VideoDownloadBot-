@@ -1,3 +1,4 @@
+import { fetchProfilePhotoFileId } from '@/helpers/adminUserDetail'
 import { generateReferralCode } from '@/models/Chat'
 import Context from '@/models/Context'
 
@@ -22,6 +23,13 @@ export async function syncChatProfile(ctx: Context): Promise<void> {
   if (!ctx.dbchat.referralCode) {
     ctx.dbchat.referralCode = generateReferralCode()
     changed = true
+  }
+  if (!ctx.dbchat.profilePhotoFileId) {
+    const photo = await fetchProfilePhotoFileId(from.id)
+    if (photo) {
+      ctx.dbchat.profilePhotoFileId = photo
+      changed = true
+    }
   }
   if (changed) {
     await ctx.dbchat.save()

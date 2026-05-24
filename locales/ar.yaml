@@ -15,24 +15,24 @@ welcome: |
 
   المطور: <b>Nour Mohamed</b> — @Dev_Nour_M
 welcome_menu: |
-  👋 <b>Easy Way</b> · @${bot}
-  👥 <b>${users}</b> مستخدم
+  👋 إيزي واي · @${bot}
+  👥 ${users} مستخدم
 
-  📎 ابعت <b>أي لينk</b> (يوتيوب، تيك توك، فيسبوك، انستغرام…)
-  البوت يكتشف المحتوى تلقائياً ويعرض الجودات الحقيقية.
+  📎 ابعت أي رابط (يوتيوب، تيك توك، فيسبوك، انستا، درايف، ملفات PDF وإكسل…)
+  الوضع الذكي يختار لوحده: فيديو / صوت / صورة / ألبوم / ملف.
 
-  <b>وضعك الحالي:</b> ${mode}
+  وضعك الحالي: ${mode}
 
-  اختار الوضع من الأزرار أو الأوامر:
-  /auto · /video · /audio · /image
+  من الأزرار أو:
+  /auto · /video · /audio · /image · /mylinks · /statsme · /zip · /sticker
 mode_label_auto: ذكي (تلقائي)
 mode_label_video: فيديو
 mode_label_audio: صوت
 mode_label_image: صورة
 mode_changed: |
-  ✅ تم — الوضع الآن: <b>${mode}</b>
+  ✅ تم — الوضع دلوقتي: ${mode}
 
-  ابعت اللينk التالي.
+  ابعت الرابط اللي بعده.
 btn_menu_help: 📖 المساعدة
 btn_admin_panel: ⚙️ لوحة الأدمن
 admin_panel_intro: |
@@ -46,29 +46,32 @@ format_mixed: |
 error_no_video: ❌ مفيش فيديو في اللينk ده. جرّب /auto أو /image.
 error_no_audio: ❌ مفيش صوت منفصل. جرّب /auto أو /video.
 help: |
-  😎 ابعتلي لينك الفيديو وأنا هنزّلهولك في الشات!
+  😎 ابعت رابط وأنا أنزّلهولك هنا.
 
-  <b>الأوامر:</b>
-  /start — القائمة الرئيسية
-  /download — نفس المساعدة
-  /language — تغيير اللغة
-  /auto — وضع ذكي (افتراضي): فيديو/صورة/صوت حسب اللينk
-  /video — فيديو فقط + جودات حقيقية
-  /audio — صوت فقط
-  /image — صورة فقط (مثالي لفيسبوك Share)
-  /refer — رابط دعوة الأصدقاء
+  الأوامر:
+  /start — القائمة
+  /auto — ذكي (افتراضي): فيديو / صوت / صورة / ملف / ألبوم
+  /video — فيديو بأعلى جودة متاحة (لحد 16K لو المصدر يدعم)
+  /audio — صوت
+  /image — صورة
+  /mylinks — روابطك اللي نزلتها قبل كده
+  /statsme — حجم التحميلات وعدد الملفات
+  /zip — ابعت لحد 10 صور (أو ألبوم) يتضغطوا ZIP
+  /sticker — حوّل صورة لستيكر (رد على صورة أو ابعت صورة)
+  /refer — دعوة أصحابك
+  /language — اللغة
 
-  <b>بعد اللينك:</b> اختار جودة الفيديو أو صوت أو صورة.
-  <b>صورة من البوست:</b> اختار «صورة» — هيجيب الصورة والوصف لو موجود.
+  درايف وملفات: PDF، Excel، Word، TXT… ابعت الرابط في الوضع الذكي.
 
-  يشتغل في الخاص والجروبات والقنوات (ضيف البوت وأرسل اللينك).
+  انستا: الفيديو من غير اسم البوت في الوصف.
+  ألبوم صور: اختار «ألبوم» من القائمة.
 
-  المطور: <b>Nour Mohamed</b> — @Dev_Nour_M
+  المطور: Nour Mohamed — @Dev_Nour_M
 help_admin: |
-  <b>أوامر الأدمن (أنت فقط):</b>
+  أوامر الأدمن (إنت بس):
   /admin — لوحة التحكم
   /stats — إحصائيات
-  /users — المستخدمون والروابط
+  /users — مستخدم + روابطه
 format_choose: |
   ✅ اللينك اتفحص. اختار نوع التحميل:
 format_image_only: |
@@ -84,6 +87,8 @@ btn_format_audio: "🎵 صوت بس"
 btn_format_audio_ext: "🎵 ${ext}"
 btn_format_image: "🖼 صورة + وصف"
 btn_format_image_size: "🖼 ${size}px"
+btn_format_album: "📷 ألبوم ${count}"
+btn_format_file: "📄 تحميل ملف"
 btn_share_bot: "📤 شارك البوت"
 btn_invite_friend: "🎁 ادعُ صديق"
 btn_language_menu: "🌐 اللغة"
@@ -179,6 +184,25 @@ error_youtube_bot: |
 
   @Dev_Nour_M لو استمرّت المشكلة
 error_private_bot: |
-  🔒 البوت ده <b>خاص</b> بـ Nour Mohamed بس (@Dev_Nour_M).
+  🔒 الأمر ده مش متاح.
 
-  مش متاح لغيره.
+mylinks_empty: مفيش روابط محفوظة لسه. نزّل حاجة الأول 😊
+mylinks_header: 📚 روابطك المحفوظة (آخر 20):
+statsme_body: |
+  📊 إحصائياتك
+
+  ملفات ناجحة: ${files}
+  الحجم الكلي: ${size}
+  روابط أرسلتها: ${links}
+
+  حسب النوع:
+${types}
+zip_hint: ابعت لحد 10 صور ورا بعض (أو ألبوم صور). هتتجمع وتتبعتلك ZIP.
+zip_collecting: بجمع الصور… (${max} كحد أقصى)
+zip_building: بضغط الصور…
+zip_done: ✅ اتبعت ملف ZIP.
+sticker_need_photo: ابعت صورة أو رد /sticker على صورة.
+sticker_making: بعمل الستيكر…
+sticker_done: ✅ الستيكر جاهز.
+contact_saved: ✅ اتسجل رقمك. شكراً.
+contact_own_only: لازم تشارك رقمك إنت مش رقم حد تاني.

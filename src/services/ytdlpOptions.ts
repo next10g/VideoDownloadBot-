@@ -23,6 +23,7 @@ export interface DownloadFlagOverrides {
   relaxedFormat?: boolean
   maxHeight?: number
   imageMode?: boolean
+  fileMode?: boolean
   preferredAudioExt?: string
   /** Facebook / TikTok / Instagram share links need site-specific extractor args. */
   sourceUrl?: string
@@ -33,8 +34,16 @@ function videoFormat(
   relaxed: boolean,
   maxHeight: number,
   imageMode: boolean,
-  audioExt?: string
+  audioExt?: string,
+  fileMode?: boolean
 ): string {
+  if (fileMode) {
+    return [
+      `best[filesize<=${maxFilesize}]`,
+      `best[filesize_approx<=${maxFilesize}]`,
+      'best',
+    ].join('/')
+  }
   if (imageMode) {
     const dim =
       maxHeight > 0 && maxHeight < 9999 ? maxHeight : env.YOUTUBE_MAX_HEIGHT
@@ -133,10 +142,11 @@ export function buildDownloadFlags(
 ): YtDlpFlags {
   const ffmpeg = getFfmpegPath()
   const imageMode = overrides?.imageMode ?? false
+  const fileMode = overrides?.fileMode ?? false
   const maxHeight = overrides?.maxHeight && overrides.maxHeight > 0
     ? overrides.maxHeight
     : env.YOUTUBE_MAX_HEIGHT
-  const thumbs = !audio && !imageMode && !env.SKIP_THUMBNAILS
+  const thumbs = !audio && !imageMode && !fileMode && !env.SKIP_THUMBNAILS
 
   const relaxed = overrides?.relaxedFormat ?? Boolean(overrides?.cookiesPath)
   const forFacebook = overrides?.sourceUrl
@@ -159,7 +169,8 @@ export function buildDownloadFlags(
       relaxed,
       maxHeight,
       imageMode,
-      overrides?.preferredAudioExt
+      overrides?.preferredAudioExt,
+      fileMode
     ),
     formatSort: relaxed
       ? `res:${maxHeight},ext:mp4:m4a,size`

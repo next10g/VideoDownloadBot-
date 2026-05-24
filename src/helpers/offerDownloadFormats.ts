@@ -27,6 +27,7 @@ import {
   youtubeCooldownRemainingSeconds,
 } from '@/helpers/youtubeCooldown'
 import { isYoutubeUrl } from '@/helpers/youtubeUrl'
+import { isGenericFileUrl } from '@/helpers/isGenericFileUrl'
 
 export default async function offerDownloadFormats(ctx: Context, rawUrl: string) {
   const url = normalizeUrl(rawUrl)
@@ -68,6 +69,14 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
     await logSubmittedLink(ctx, checkedUrl, { title: offer.title })
 
     const jobUrl = offer.downloadUrl || checkedUrl
+
+    if (offer.isFile || isGenericFileUrl(checkedUrl)) {
+      return createDownloadJobAndRequest(ctx, jobUrl, {
+        downloadMode: DownloadMode.file,
+        maxHeight: 0,
+        audio: false,
+      })
+    }
 
     if (preference === 'audio') {
       if (offer.hasAudio || offer.videoHeights.length > 0) {
