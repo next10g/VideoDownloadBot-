@@ -181,6 +181,16 @@ export async function probeMediaOffer(url: string): Promise<MediaFormatOffer> {
           logger.info('facebook share fallback ok', { url })
           return offerFromFacebook(shareRetry, url)
         }
+        // Probe failed but link is Meta share/photo — show image button anyway;
+        // download step runs full embed again (often succeeds on second pass).
+        logger.info('facebook share photo menu (soft)', { url, downloadUrl })
+        return {
+          title: 'Facebook',
+          videoHeights: [],
+          hasImage: true,
+          hasAudio: false,
+          downloadUrl: url,
+        }
       }
       throw new ValidationError(
         'Facebook photo could not be loaded from this server (public posts only)',
