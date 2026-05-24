@@ -1,4 +1,6 @@
 import { filterSocialImageUrls } from '@/helpers/filterSocialImageUrls'
+import { isInstagramReelUrl } from '@/helpers/instagramUrl'
+import env from '@/helpers/env'
 import logger from '@/lib/logger'
 
 const IG_UA =
@@ -7,31 +9,63 @@ const IG_UA =
 const IG_DESKTOP_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 
+/** More than this usually means we scraped suggested posts / UI chrome. */
+const SCRAPE_SANITY_MAX = 15
+
 function decodeJsonUrl(raw: string): string {
   return raw.replace(/\\u0026/g, '&').replace(/\\\//g, '/')
 }
 
-function extractDisplayUrlsFromHtml(html: string): string[] {
-  const urls = new Set<string>()
-  const patterns = [
-    /"display_url":"([^"]+)"/g,
-    /"display_resources":\[[^\]]*"src":"([^"]+)"/g,
-    /"url":"(https?:\\\/\\\/[^"]+?cdninstagram[^"]+)"/gi,
-    /property="og:image" content="([^"]+)"/g,
-    /"thumbnail_src":"([^"]+)"/g,
-    /(https:\/\/[^\s"'\\]+\.cdninstagram\.com\/[^\s"'\\]+)/gi,
-    /(https:\/\/[^\s"'\\]+?scontent[^\s"'\\]*?cdninstagram[^\s"'\\]+)/gi,
+function collectDisplayUrls(html: string, start: number, maxLen: number): string[] {
+  const slice = html.slice(start, start + maxLen)
+  const urls: string[] = []
+  const re = /"display_url":"([^"]+)"/g
+  let match: RegExpExecArray | null
+  while ((match = re.exec(slice))) {
+    const raw = decodeJsonUrl(match[1])
+    if (raw.startsWith('http')) {
+      urls.push(raw.split('&amp;').join('&'))
+    }
+  }
+  return urls
+}
+
+/** Carousel slides only (edge_sidecar_to_children block). */
+function extractSidecarDisplayUrls(html: string): string[] {
+  const idx = html.indexOf('edge_sidecar_to_children')
+  if (idx < 0) {
+    return []
+  }
+  return collectDisplayUrls(html, idx, 400_000)
+}
+
+/** Single photo post — one display_url from the main media node. */
+function extractSinglePostDisplayUrl(html: string): string[] {
+  const markers = [
+    '"__typename":"GraphImage"',
+    '"__typename":"XDTGraphImage"',
+    '"is_video":false',
+    '"shortcode_media":',
   ]
-  for (const re of patterns) {
-    let match: RegExpExecArray | null
-    while ((match = re.exec(html))) {
-      const raw = decodeJsonUrl(match[1] || match[0])
-      if (raw.startsWith('http') && /cdninstagram|fbcdn/i.test(raw)) {
-        urls.add(raw.split('&amp;').join('&'))
+  for (const marker of markers) {
+    const idx = html.indexOf(marker)
+    if (idx < 0) {
+      continue
+    }
+    const chunk = html.slice(idx, idx + 12_000)
+    const m = chunk.match(/"display_url":"([^"]+)"/)
+    if (m) {
+      const url = decodeJsonUrl(m[1])
+      if (url.startsWith('http')) {
+        return [url]
       }
     }
   }
-  return [...urls]
+  const og = html.match(/property="og:image" content="([^"]+)"/)
+  if (og?.[1]?.startsWith('http')) {
+    return [og[1]]
+  }
+  return []
 }
 
 async function fetchHtml(url: string, ua: string): Promise<string> {
@@ -52,13 +86,15 @@ async function fetchHtml(url: string, ua: string): Promise<string> {
   return res.text()
 }
 
-async function scrapeEmbed(postUrl: string, suffix: string): Promise<string[]> {
+async function scrapeEmbedHtml(postUrl: string): Promise<string> {
   const base = postUrl.split('?')[0].replace(/\/$/, '')
-  const html = await fetchHtml(`${base}/${suffix}`, IG_DESKTOP_UA)
-  if (!html) {
-    return []
+  for (const suffix of ['embed/captioned/', 'embed/']) {
+    const html = await fetchHtml(`${base}/${suffix}`, IG_DESKTOP_UA)
+    if (html) {
+      return html
+    }
   }
-  return extractDisplayUrlsFromHtml(html)
+  return ''
 }
 
 async function scrapeOembed(postUrl: string): Promise<string[]> {
@@ -78,37 +114,55 @@ async function scrapeOembed(postUrl: string): Promise<string[]> {
   }
 }
 
-/** Scrape IG photo/carousel URLs without cookies (embed → post page → oEmbed). */
-export async function scrapeAllInstagramImages(postUrl: string): Promise<string[]> {
-  const collected = new Set<string>()
+function parsePostImages(html: string): string[] {
+  const sidecar = extractSidecarDisplayUrls(html)
+  if (sidecar.length > 0) {
+    return sidecar
+  }
+  return extractSinglePostDisplayUrl(html)
+}
 
-  for (const suffix of ['embed/captioned/', 'embed/']) {
-    for (const url of await scrapeEmbed(postUrl, suffix)) {
-      collected.add(url)
-    }
-    if (collected.size > 0) {
-      break
-    }
+/** Scrape IG photo/carousel URLs without cookies. Reels return []. */
+export async function scrapeAllInstagramImages(postUrl: string): Promise<string[]> {
+  if (isInstagramReelUrl(postUrl)) {
+    return []
   }
 
-  if (collected.size === 0) {
+  let raw: string[] = []
+  const embedHtml = await scrapeEmbedHtml(postUrl)
+  if (embedHtml) {
+    raw = parsePostImages(embedHtml)
+  }
+
+  if (raw.length === 0) {
     const pageHtml = await fetchHtml(postUrl, IG_UA)
     if (pageHtml) {
-      for (const url of extractDisplayUrlsFromHtml(pageHtml)) {
-        collected.add(url)
-      }
+      raw = parsePostImages(pageHtml)
     }
   }
 
-  if (collected.size === 0) {
-    for (const url of await scrapeOembed(postUrl)) {
-      collected.add(url)
-    }
+  if (raw.length === 0) {
+    raw = await scrapeOembed(postUrl)
   }
 
-  const filtered = filterSocialImageUrls([...collected], postUrl)
+  if (raw.length > SCRAPE_SANITY_MAX) {
+    logger.warn('instagram scrape too many candidates, using oembed', {
+      url: postUrl,
+      count: raw.length,
+    })
+    raw = await scrapeOembed(postUrl)
+  }
+
+  const filtered = filterSocialImageUrls(raw, postUrl).slice(
+    0,
+    env.ALBUM_MAX_IMAGES
+  )
   if (filtered.length > 0) {
-    logger.info('instagram scrape ok', { url: postUrl, count: filtered.length })
+    logger.info('instagram scrape ok', {
+      url: postUrl,
+      count: filtered.length,
+      carousel: filtered.length > 1,
+    })
   }
   return filtered
 }

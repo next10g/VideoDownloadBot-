@@ -68,11 +68,15 @@ function run(cmd, args) {
   return result.status === 0
 }
 
-if (!run(npmBin, ['install'])) {
+if (!run(npmBin, ['install', '--include=optional'])) {
   console.log('npm install failed — retrying with --ignore-scripts')
   if (!run(npmBin, ['install', '--ignore-scripts'])) {
     process.exit(1)
   }
+}
+
+if (!run(npmBin, ['rebuild', 'sharp'])) {
+  console.warn('sharp rebuild failed — Instagram photos will use ffmpeg instead')
 }
 
 if (!run(nodeBin, ['scripts/ensure-ytdlp.js'])) {

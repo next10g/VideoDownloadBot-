@@ -17,8 +17,8 @@ export async function downloadImagesToDir(
   for (let i = 0; i < limited.length; i++) {
     const dest = join(jobDir, `img${i + 1}.jpg`)
     try {
-      await fetchImageToFile(limited[i], dest)
-      const ready = await prepareTelegramPhoto(dest, jobDir)
+      const downloaded = await fetchImageToFile(limited[i], dest)
+      const ready = await prepareTelegramPhoto(downloaded, jobDir)
       paths.push(ready)
     } catch (error) {
       logger.warn('social image skip', {

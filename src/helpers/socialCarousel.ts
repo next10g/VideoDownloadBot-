@@ -1,7 +1,7 @@
 import { filterSocialImageUrls } from '@/helpers/filterSocialImageUrls'
 import { scrapeAllInstagramImages } from '@/helpers/instagramScrape'
 import { isFacebookUrl } from '@/helpers/facebookUrl'
-import { isInstagramUrl } from '@/helpers/instagramUrl'
+import { isInstagramUrl, isInstagramReelUrl } from '@/helpers/instagramUrl'
 import logger from '@/lib/logger'
 import { extractAlbumImageUrls } from '@/services/albumExtract'
 import { buildProbeFlags } from '@/services/ytdlpOptions'
@@ -55,7 +55,7 @@ async function probeWithYtdlp(url: string, timeout: number): Promise<string[]> {
 export async function probeSocialImageUrls(url: string): Promise<string[]> {
   const timeout = probeTimeoutMs(url)
 
-  if (isInstagramUrl(url)) {
+  if (isInstagramUrl(url) && !isInstagramReelUrl(url)) {
     const scraped = await scrapeAllInstagramImages(url)
     if (scraped.length > 0) {
       return scraped
@@ -77,7 +77,7 @@ export async function probeSocialImageUrls(url: string): Promise<string[]> {
     })
   }
 
-  if (isInstagramUrl(url)) {
+  if (isInstagramUrl(url) && !isInstagramReelUrl(url)) {
     return scrapeAllInstagramImages(url)
   }
 

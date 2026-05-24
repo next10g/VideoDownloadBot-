@@ -139,8 +139,11 @@ async function resolveFromInfoJsonOnly(
   }
   if (urls.length === 1) {
     const dest = join(jobDir, 'video.jpg')
-    await fetchImageToFile(urls[0], dest)
-    return { kind: 'single', path: await prepareTelegramPhoto(dest, jobDir) }
+    const downloaded = await fetchImageToFile(urls[0], dest)
+    return {
+      kind: 'single',
+      path: await prepareTelegramPhoto(downloaded, jobDir),
+    }
   }
   if (info.entries?.length && info.entries.length > 1) {
     const entryPaths = await downloadCarouselEntriesFromInfo(info, jobDir)
@@ -168,10 +171,10 @@ async function deliverSocialImages(
   }
   if (urls.length === 1) {
     const dest = join(jobDir, 'video.jpg')
-    await fetchImageToFile(urls[0], dest)
+    const downloaded = await fetchImageToFile(urls[0], dest)
     return {
       kind: 'single',
-      path: await prepareTelegramPhoto(dest, jobDir),
+      path: await prepareTelegramPhoto(downloaded, jobDir),
     }
   }
   return undefined
@@ -291,9 +294,9 @@ export default async function downloadUrl(
         photoPaths = await downloadImagesToDir(imageUrls, jobDir)
         info = { title: 'Album' } as YtDlpMetadata
       } else if (imageUrls.length === 1) {
-        filePath = join(jobDir, 'video.jpg')
-        await fetchImageToFile(imageUrls[0], filePath)
-        filePath = await prepareTelegramPhoto(filePath, jobDir)
+        const dest = join(jobDir, 'video.jpg')
+        const downloaded = await fetchImageToFile(imageUrls[0], dest)
+        filePath = await prepareTelegramPhoto(downloaded, jobDir)
         info = { title: 'Photo', ext: 'jpg' } as YtDlpMetadata
       }
     }
@@ -444,9 +447,9 @@ export default async function downloadUrl(
             if (urls.length > 1) {
               photoPaths = await downloadImagesToDir(urls, jobDir)
             } else if (urls.length === 1) {
-              filePath = join(jobDir, 'video.jpg')
-              await fetchImageToFile(urls[0], filePath)
-              filePath = await prepareTelegramPhoto(filePath, jobDir)
+              const dest = join(jobDir, 'video.jpg')
+              const downloaded = await fetchImageToFile(urls[0], dest)
+              filePath = await prepareTelegramPhoto(downloaded, jobDir)
             } else {
               const social = await deliverSocialImages(
                 downloadJob.url,
@@ -491,7 +494,12 @@ export default async function downloadUrl(
         await Promise.all(photoPaths.map((p) => assertFileWithinLimits(p)))
       ).reduce((a, b) => a + b, 0)
 
-      const audioPath = await tryDownloadSidecarAudio(downloadJob.url, jobDir)
+      const audioPath =
+        photoPaths.length > 1 &&
+        !isInstagramReelUrl(downloadJob.url) &&
+        isInstagramUrl(downloadJob.url)
+          ? await tryDownloadSidecarAudio(downloadJob.url, jobDir)
+          : undefined
       if (audioPath) {
         await sendCompletedFile(
           downloadJob.originalChatId,
