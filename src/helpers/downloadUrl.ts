@@ -54,7 +54,9 @@ import {
   downloadInstagramPostImages,
   shouldUseInstagramDownloaders,
 } from '@/helpers/instagramImageDownload'
+import { skipInstagramPhotoPaths } from '@/helpers/instagramMediaPolicy'
 import { downloadMetaCarousel } from '@/services/metaCarouselDownload'
+import { runInstagramVideoDownload } from '@/services/instagramVideoDownload'
 import { sendPhotoAlbum } from '@/helpers/sendPhotoAlbum'
 import { collectImageUrlsFromInfo } from '@/helpers/extractImageUrlsFromInfo'
 import { prepareTelegramPhoto } from '@/helpers/prepareTelegramPhoto'
@@ -295,8 +297,35 @@ export default async function downloadUrl(
     let ytdlpResult = { stderr: '' }
 
     const isSocial = isSocialCarouselUrl(downloadJob.url)
+    const skipIgPhotos = skipInstagramPhotoPaths(downloadJob.url)
 
     if (
+      isInstagramUrl(downloadJob.url) &&
+      !wantImages &&
+      !filePath &&
+      !downloadJob.audio
+    ) {
+      try {
+        const igResult = await runInstagramVideoDownload(
+          downloadJob.url,
+          jobDir,
+          outputBase,
+          downloadJob.audio,
+          maxHeight
+        )
+        filePath = igResult.filePath
+        info = igResult.info
+        ytdlpResult = { stderr: igResult.stderr }
+      } catch (error) {
+        logger.warn('instagram video path failed, will try generic yt-dlp', {
+          url: downloadJob.url,
+          detail: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+
+    if (
+      !skipIgPhotos &&
       isSocial &&
       wantImages &&
       (albumMode || imageMode) &&
@@ -319,7 +348,13 @@ export default async function downloadUrl(
       }
     }
 
-    if (albumMode && downloadJob.albumUrls?.length && !filePath && !photoPaths?.length) {
+    if (
+      !skipIgPhotos &&
+      albumMode &&
+      downloadJob.albumUrls?.length &&
+      !filePath &&
+      !photoPaths?.length
+    ) {
       if (shouldUseInstagramDownloaders(downloadJob.url)) {
         const rawPaths = await downloadInstagramPostImages(
           downloadJob.url,
@@ -354,7 +389,7 @@ export default async function downloadUrl(
       }
     }
 
-    if (!filePath && !photoPaths?.length && isSocial && wantImages) {
+    if (!skipIgPhotos && !filePath && !photoPaths?.length && isSocial && wantImages) {
       if (shouldUseInstagramDownloaders(downloadJob.url)) {
         try {
           const rawPaths = await downloadInstagramPostImages(
@@ -465,7 +500,11 @@ export default async function downloadUrl(
           )
         } catch (error) {
           const detail = error instanceof Error ? error.message.toLowerCase() : ''
-          if (detail.includes('no video in this post')) {
+          if (
+            detail.includes('no video in this post') &&
+            wantImages &&
+            !skipIgPhotos
+          ) {
             ytdlpResult = await runYtdlpDownload(
               targetUrl,
               {
@@ -550,7 +589,7 @@ export default async function downloadUrl(
         } catch {
           const hint =
             ytdlpResult.stderr.slice(0, 300) || entries.join(', ') || 'empty'
-          if (isSocial && wantImages) {
+          if (isSocial && wantImages && !skipIgPhotos) {
             const urls = await probeSocialImageUrls(downloadJob.url)
             if (urls.length > 1) {
               photoPaths = await downloadImagesToDir(

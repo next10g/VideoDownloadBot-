@@ -146,6 +146,9 @@ error_youtube_bot: |
   This is a <b>public</b> bot — it does not use your personal login or cookies.
 
   Contact @Dev_Nour_M if it keeps failing.
+error_instagram_video_only: |
+  Instagram: this bot downloads **videos and reels** only (yt-dlp).
+  Photo carousels are disabled — send a /reel/ link or a video post. Use /video or /auto.
 error_private_bot: |
   🔒 This bot is <b>private</b> for Nour Mohamed only (@Dev_Nour_M).
 

@@ -28,7 +28,7 @@ import {
 } from '@/helpers/youtubeCooldown'
 import { isFacebookUrl } from '@/helpers/facebookUrl'
 import { isInstagramUrl } from '@/helpers/instagramUrl'
-import { probeMetaCarouselUrls } from '@/services/metaCarouselDownload'
+import { igPhotosEnabled } from '@/helpers/instagramMediaPolicy'
 import { isYoutubeUrl } from '@/helpers/youtubeUrl'
 import { isGenericFileUrl } from '@/helpers/isGenericFileUrl'
 import { saveDbChat } from '@/helpers/saveDbChat'
@@ -90,17 +90,27 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
       })
     }
 
-    const isReel = /\/reel\//i.test(checkedUrl)
+    const isReel = /\/(reel|tv)\//i.test(checkedUrl)
 
-    if (
-      (isInstagramUrl(checkedUrl) || isFacebookUrl(checkedUrl)) &&
-      !isReel &&
-      offer.albumUrls.length <= 1
-    ) {
-      const metaUrls = await probeMetaCarouselUrls(jobUrl)
-      if (metaUrls.length > offer.albumUrls.length) {
-        offer.albumUrls = metaUrls
-        offer.hasAlbum = metaUrls.length > 1
+    if (isInstagramUrl(checkedUrl) && !igPhotosEnabled()) {
+      if (preference === 'carousel' || preference === 'image') {
+        await editor.editMessage(ctx.i18n.t('error_instagram_video_only'))
+        return
+      }
+      const heights = offer.videoHeights.filter((h) => h > 0)
+      const maxH = heights[0] ?? 1080
+      if (
+        !env.SHOW_FORMAT_MENU ||
+        preference === 'auto' ||
+        preference === 'video'
+      ) {
+        if (preference !== 'audio') {
+          return createDownloadJobAndRequest(ctx, jobUrl, {
+            downloadMode: DownloadMode.video,
+            maxHeight: maxH,
+            audio: false,
+          })
+        }
       }
     }
 
@@ -109,7 +119,9 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
       offer.videoHeights.length === 0 &&
       (preference === 'carousel' ||
         (preference === 'auto' &&
-          (offer.hasAlbum || offer.albumUrls.length > 1)))
+          (offer.hasAlbum || offer.albumUrls.length > 1))) &&
+      (isFacebookUrl(checkedUrl) ||
+        (isInstagramUrl(checkedUrl) && igPhotosEnabled()))
 
     if (wantCarousel && offer.albumUrls.length > 0) {
       return createDownloadJobAndRequest(ctx, jobUrl, {
@@ -263,7 +275,7 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
       return
     }
     const detail = error instanceof Error ? error.message : String(error)
-    if (isInstagramUrl(url) || isFacebookUrl(url)) {
+    if (isFacebookUrl(url) || (isInstagramUrl(url) && igPhotosEnabled())) {
       try {
         const { probeSocialImageUrls } = await import('@/helpers/socialCarousel')
         const albumUrls = await probeSocialImageUrls(url)

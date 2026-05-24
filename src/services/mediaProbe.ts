@@ -3,6 +3,7 @@ import env from '@/helpers/env'
 import { isFacebookUrl } from '@/helpers/facebookUrl'
 
 import { isInstagramReelUrl, isInstagramUrl } from '@/helpers/instagramUrl'
+import { igPhotosEnabled } from '@/helpers/instagramMediaPolicy'
 
 import logger from '@/lib/logger'
 
@@ -131,11 +132,14 @@ function offerFromFacebook(
 
 
 function offerFromYtdlp(meta: YtDlpMetadata, downloadUrl?: string): MediaFormatOffer {
-  const isReel = Boolean(downloadUrl && /\/reel\//i.test(downloadUrl))
+  const isReel = Boolean(downloadUrl && /\/(reel|tv)\//i.test(downloadUrl))
   const formats = (meta as YtDlpMetadata & { formats?: Record<string, unknown>[] })
     .formats
   const parsed = mergeFormatHints(parseYtdlpFormats(formats), meta)
-  const albumUrls = isReel ? [] : extractAlbumImageUrls(meta)
+  const skipIgAlbum =
+    Boolean(downloadUrl && isInstagramUrl(downloadUrl) && !igPhotosEnabled())
+  const albumUrls =
+    isReel || skipIgAlbum ? [] : extractAlbumImageUrls(meta)
 
   return {
     title: meta.title || 'Video',
@@ -178,6 +182,7 @@ async function probeYtdlp(url: string): Promise<MediaFormatOffer> {
       error instanceof Error ? error.message : String(error)
     if (
       isInstagramUrl(url) &&
+      igPhotosEnabled() &&
       detail.toLowerCase().includes('no video in this post')
     ) {
       const { probeInstagramImageUrls } = await import('@/helpers/socialCarousel')

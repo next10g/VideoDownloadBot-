@@ -7,6 +7,11 @@ export function isInstagramUrl(url: string): boolean {
   }
 }
 
+/** Reels, IGTV (/tv/), and other direct video paths — never treat as photo carousel. */
 export function isInstagramReelUrl(url: string): boolean {
-  return isInstagramUrl(url) && /\/reel\//i.test(url)
+  return isInstagramUrl(url) && /\/(reel|tv)\//i.test(url)
+}
+
+export function isInstagramVideoPostUrl(url: string): boolean {
+  return isInstagramReelUrl(url)
 }

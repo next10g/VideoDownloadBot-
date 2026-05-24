@@ -1,4 +1,5 @@
 import { filterSocialImageUrls } from '@/helpers/filterSocialImageUrls'
+import { igPhotosEnabled } from '@/helpers/instagramMediaPolicy'
 import { isInstagramUrl } from '@/helpers/instagramUrl'
 import { extractAlbumImageUrls } from '@/services/albumExtract'
 import type { YtDlpMetadata } from '@/services/ytdlpTypes'
@@ -34,7 +35,7 @@ export async function collectImageUrlsFromInfo(
     }
   }
 
-  if (urls.size === 0 && isInstagramUrl(pageUrl)) {
+  if (urls.size === 0 && isInstagramUrl(pageUrl) && igPhotosEnabled()) {
     const { scrapeAllInstagramImages } = await import('@/helpers/instagramScrape')
     const scraped = await scrapeAllInstagramImages(pageUrl)
     for (const u of scraped) {

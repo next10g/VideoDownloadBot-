@@ -94,7 +94,11 @@ const env = cleanEnv(process.env, {
   }),
   ALLOW_CAROUSEL: bool({
     default: true,
-    desc: 'Allow social post carousels (Instagram/Facebook multi-image posts)',
+    desc: 'Allow social post carousels (Facebook multi-image; IG needs IG_PHOTOS_ENABLED)',
+  }),
+  IG_PHOTOS_ENABLED: bool({
+    default: false,
+    desc: 'Instagram photo/carousel via embed scrape (off = reels/video only via yt-dlp)',
   }),
   SHOW_FORMAT_MENU: bool({
     default: true,
