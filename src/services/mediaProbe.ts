@@ -167,6 +167,28 @@ function probeTimeoutMs(url: string): number {
   return env.YTDLP_PROBE_TIMEOUT_MS
 }
 
+async function probeInstagramUrl(url: string): Promise<MediaFormatOffer> {
+  try {
+    return await probeYtdlp(url)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    const { isInstagramYtdlpBlocked, probeInstagramEmbedOffer } = await import(
+      '@/services/instagramEmbedMedia'
+    )
+    if (env.IG_EMBED_FALLBACK && isInstagramYtdlpBlocked(detail)) {
+      logger.warn('instagram ytdlp blocked, embed probe', {
+        url,
+        detail: detail.slice(0, 160),
+      })
+      const embed = await probeInstagramEmbedOffer(url)
+      if (embed) {
+        return embed
+      }
+    }
+    throw error
+  }
+}
+
 async function probeYtdlp(url: string): Promise<MediaFormatOffer> {
   const timeout = probeTimeoutMs(url)
   let meta: YtDlpMetadata
@@ -180,6 +202,15 @@ async function probeYtdlp(url: string): Promise<MediaFormatOffer> {
   } catch (error) {
     const detail =
       error instanceof Error ? error.message : String(error)
+    const { isInstagramYtdlpBlocked, probeInstagramEmbedOffer } = await import(
+      '@/services/instagramEmbedMedia'
+    )
+    if (isInstagramUrl(url) && env.IG_EMBED_FALLBACK && isInstagramYtdlpBlocked(detail)) {
+      const embed = await probeInstagramEmbedOffer(url)
+      if (embed) {
+        return embed
+      }
+    }
     if (
       isInstagramUrl(url) &&
       igPhotosEnabled() &&
@@ -403,25 +434,11 @@ export async function probeMediaOffer(url: string): Promise<MediaFormatOffer> {
 
 
   if (isInstagramUrl(url)) {
-    logger.info('instagram probe', { url })
-    if (!isInstagramReelUrl(url)) {
-      const { probeInstagramImageUrls } = await import('@/helpers/socialCarousel')
-      const albumUrls = await probeInstagramImageUrls(url)
-      if (albumUrls.length > 0) {
-        return {
-          title: 'Instagram',
-          videoHeights: [],
-          imageSizes: [1080],
-          audioExts: [],
-          hasImage: true,
-          hasAudio: false,
-          downloadUrl: url,
-          albumUrls,
-          hasAlbum: albumUrls.length > 1,
-          isFile: false,
-        }
-      }
-    }
+    logger.info('instagram probe', {
+      url,
+      embedFallback: env.IG_EMBED_FALLBACK,
+    })
+    return probeInstagramUrl(url)
   }
 
   return probeYtdlp(url)

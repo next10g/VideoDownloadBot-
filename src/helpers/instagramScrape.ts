@@ -170,32 +170,22 @@ export async function scrapeAllInstagramImages(postUrl: string): Promise<string[
     raw = await scrapeOembed(postUrl)
   }
 
-  if (raw.length > SCRAPE_SANITY_MAX) {
-    logger.warn('instagram scrape too many candidates, using oembed', {
+  const deduped = dedupeByAssetId(raw)
+  if (deduped.length > SCRAPE_SANITY_MAX && !htmlHasSidecar(sidecarHtml)) {
+    logger.warn('instagram scrape trimmed excess urls', {
       url: postUrl,
-      count: raw.length,
+      before: deduped.length,
+      kept: SCRAPE_SANITY_MAX,
     })
-    raw = await scrapeOembed(postUrl)
+    raw = deduped.slice(0, SCRAPE_SANITY_MAX)
+  } else {
+    raw = deduped
   }
 
-  let filtered =
+  const filtered =
     raw.length > 1
-      ? dedupeByAssetId(raw).slice(0, env.ALBUM_MAX_IMAGES)
+      ? raw.slice(0, env.ALBUM_MAX_IMAGES)
       : filterSocialImageUrls(raw, postUrl).slice(0, env.ALBUM_MAX_IMAGES)
-
-  if (filtered.length <= 1) {
-    const { probeYtdlpInstagramCarousel } = await import(
-      '@/services/instagramYtdlpCarousel'
-    )
-    const ytdlpUrls = await probeYtdlpInstagramCarousel(postUrl)
-    if (ytdlpUrls.length > filtered.length) {
-      filtered = ytdlpUrls.slice(0, env.ALBUM_MAX_IMAGES)
-      logger.info('instagram scrape ytdlp fallback', {
-        url: postUrl,
-        count: filtered.length,
-      })
-    }
-  }
 
   if (filtered.length > 0) {
     logger.info('instagram scrape ok', {

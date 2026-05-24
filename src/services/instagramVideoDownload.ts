@@ -4,6 +4,10 @@ import { buildDownloadFlags } from '@/services/ytdlpOptions'
 import { runYtdlpDownload } from '@/services/ytdlpRunner'
 import { resolveDownloadedMediaPath } from '@/helpers/resolveDownloadedFile'
 import type { YtDlpMetadata } from '@/services/ytdlpTypes'
+import {
+  downloadInstagramEmbedVideo,
+  isInstagramYtdlpBlocked,
+} from '@/services/instagramEmbedMedia'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
 
@@ -102,6 +106,30 @@ export async function runInstagramVideoDownload(
         url,
         label: attempt.label,
         detail: lastError.message.slice(0, 300),
+      })
+    }
+  }
+
+  if (isInstagramYtdlpBlocked(lastStderr)) {
+    try {
+      const dest = join(jobDir, 'video.mp4')
+      await downloadInstagramEmbedVideo(url, dest)
+      const { stat: fsStat } = await import('fs/promises')
+      const size = (await fsStat(dest)).size
+      if (size < 80_000 && /\/(reel|tv)\//i.test(url)) {
+        throw new Error('Instagram embed video too small')
+      }
+      logger.info('instagram video download ok', {
+        url,
+        bytes: size,
+        attempt: 'embed-cdn',
+      })
+      return { filePath: dest, info: { title: 'Instagram', ext: 'mp4' }, stderr: '' }
+    } catch (embedError) {
+      logger.warn('instagram embed video fallback failed', {
+        url,
+        detail:
+          embedError instanceof Error ? embedError.message : String(embedError),
       })
     }
   }

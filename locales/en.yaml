@@ -149,6 +149,9 @@ error_youtube_bot: |
 error_instagram_video_only: |
   Instagram: this bot downloads **videos and reels** only (yt-dlp).
   Photo carousels are disabled — send a /reel/ link or a video post. Use /video or /auto.
+error_instagram_rate_limit: |
+  Instagram temporarily blocked this server (rate-limit).
+  The bot will try embed fallback — retry in a minute or use a public /reel/ link.
 error_private_bot: |
   🔒 This bot is <b>private</b> for Nour Mohamed only (@Dev_Nour_M).
 

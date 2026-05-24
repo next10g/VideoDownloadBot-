@@ -209,6 +209,9 @@ error_instagram_video_only: |
   🎬 انستغرام: البوت بينزّل **فيديو وريلز** بس (yt-dlp).
   صور الكاروسيل متوقفة على السيرفر — ابعت رابط /reel/ أو بوست فيه فيديو.
   استخدم /video أو /auto.
+error_instagram_rate_limit: |
+  ⏳ انستغرام حظر السيرفر مؤقتاً (rate-limit).
+  البوت بيحاول التحميل من embed — جرّب بعد دقيقة أو رابط /reel/ عام.
 error_no_image: ❌ مفيش صورة في اللينك ده. جرّب /carousel أو /auto.
 error_youtube_cooldown: "⏳ يوتيوب: استنى ${seconds} ثانية قبل لينك تاني (البوت عام ومش بيستخدم حسابك)."
 error_youtube_bot: |

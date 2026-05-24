@@ -92,28 +92,6 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
 
     const isReel = /\/(reel|tv)\//i.test(checkedUrl)
 
-    if (isInstagramUrl(checkedUrl) && !igPhotosEnabled()) {
-      if (preference === 'carousel' || preference === 'image') {
-        await editor.editMessage(ctx.i18n.t('error_instagram_video_only'))
-        return
-      }
-      const heights = offer.videoHeights.filter((h) => h > 0)
-      const maxH = heights[0] ?? 1080
-      if (
-        !env.SHOW_FORMAT_MENU ||
-        preference === 'auto' ||
-        preference === 'video'
-      ) {
-        if (preference !== 'audio') {
-          return createDownloadJobAndRequest(ctx, jobUrl, {
-            downloadMode: DownloadMode.video,
-            maxHeight: maxH,
-            audio: false,
-          })
-        }
-      }
-    }
-
     const wantCarousel =
       !isReel &&
       offer.videoHeights.length === 0 &&

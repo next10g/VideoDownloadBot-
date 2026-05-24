@@ -185,10 +185,22 @@ export async function downloadMetaCarousel(
   url: string,
   jobDir: string
 ): Promise<string[]> {
-  const imageUrls = await probeMetaCarouselUrls(url)
+  let imageUrls = await probeMetaCarouselUrls(url)
   const useIg = isInstagramUrl(url)
 
-  if (imageUrls.length > 0) {
+  if (useIg && imageUrls.length <= 1) {
+    try {
+      const { probeInstagramEmbed } = await import('@/services/instagramEmbedMedia')
+      const embed = await probeInstagramEmbed(url)
+      if (embed.imageUrls.length > imageUrls.length) {
+        imageUrls = embed.imageUrls
+      }
+    } catch {
+      // keep scrape result
+    }
+  }
+
+  if (imageUrls.length > 1) {
     const paths = useIg
       ? await fetchInstagramSlidesToDir(imageUrls, url, jobDir)
       : await fetchFbSlidesToDir(imageUrls, url, jobDir)
@@ -200,12 +212,30 @@ export async function downloadMetaCarousel(
       })
       return paths
     }
-    if (paths.length === 1 && imageUrls.length === 1) {
-      logger.info('meta carousel download ok', {
+  }
+
+  if (useIg && env.IG_EMBED_FALLBACK) {
+    try {
+      const { downloadInstagramEmbedImages } = await import(
+        '@/services/instagramEmbedMedia'
+      )
+      const embedPaths = await downloadInstagramEmbedImages(url, jobDir)
+      if (embedPaths.length > 0) {
+        return embedPaths
+      }
+    } catch (error) {
+      logger.warn('instagram embed carousel failed', {
         url,
-        slides: 1,
-        source: 'embed-cdn-single',
+        detail: error instanceof Error ? error.message : String(error),
       })
+    }
+  }
+
+  if (imageUrls.length === 1) {
+    const paths = useIg
+      ? await fetchInstagramSlidesToDir(imageUrls, url, jobDir)
+      : await fetchFbSlidesToDir(imageUrls, url, jobDir)
+    if (paths.length === 1) {
       return paths
     }
   }

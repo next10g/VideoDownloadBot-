@@ -97,8 +97,12 @@ const env = cleanEnv(process.env, {
     desc: 'Allow social post carousels (Facebook multi-image; IG needs IG_PHOTOS_ENABLED)',
   }),
   IG_PHOTOS_ENABLED: bool({
-    default: false,
-    desc: 'Instagram photo/carousel via embed scrape (off = reels/video only via yt-dlp)',
+    default: true,
+    desc: 'Instagram photo/carousel via embed scrape',
+  }),
+  IG_EMBED_FALLBACK: bool({
+    default: true,
+    desc: 'When yt-dlp is blocked, use Instagram embed for video + carousel',
   }),
   SHOW_FORMAT_MENU: bool({
     default: true,

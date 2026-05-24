@@ -17,6 +17,9 @@ export function ytdlpErrorI18nKey(detail: string): string | undefined {
   if (lower.includes('login required')) {
     return 'error_instagram_private'
   }
+  if (lower.includes('rate-limit') || lower.includes('rate limit')) {
+    return 'error_instagram_rate_limit'
+  }
   if (
     lower.includes('no video in this post') &&
     !lower.includes('could not resolve')
