@@ -8,6 +8,7 @@ export interface StoredMediaProbe {
   hasImage: boolean
   hasAudio: boolean
   facebook?: FacebookEmbedResult
+  downloadUrl?: string
 }
 
 export function storeProbe(offer: MediaFormatOffer): string {
@@ -18,6 +19,7 @@ export function storeProbe(offer: MediaFormatOffer): string {
     hasImage: offer.hasImage,
     hasAudio: offer.hasAudio,
     facebook: offer.facebook,
+    downloadUrl: offer.downloadUrl,
   } satisfies StoredMediaProbe)
 }
 

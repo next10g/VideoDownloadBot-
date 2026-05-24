@@ -21,7 +21,12 @@ import withTimeout from '@/helpers/withTimeout'
 import logger from '@/lib/logger'
 import { isFacebookUrl } from '@/helpers/facebookUrl'
 import { isYoutubeUrl } from '@/helpers/youtubeUrl'
-import { downloadFacebookDirect } from '@/services/facebookEmbed'
+import {
+  downloadFacebookDirect,
+  pickFacebookStream,
+  probeFacebookEmbed,
+} from '@/services/facebookEmbed'
+import { resolveFacebookUrl } from '@/services/resolveFacebookUrl'
 import { buildDownloadFlags } from '@/services/ytdlpOptions'
 import { runYoutubeDownload } from '@/services/youtubeDownload'
 import { runYtdlpDownload } from '@/services/ytdlpRunner'
@@ -185,19 +190,36 @@ export default async function downloadUrl(
       jobDir,
       mode: downloadJob.downloadMode,
       maxHeight,
-      direct: Boolean(downloadJob.directStreamUrl),
+      direct: Boolean(downloadJob.directStreamUrl || isFacebookUrl(downloadJob.url)),
     })
 
     let filePath: string
     let info: YtDlpMetadata | undefined
     let ytdlpResult = { stderr: '' }
 
-    if (downloadJob.directStreamUrl) {
+    let directUrl = downloadJob.directStreamUrl
+
+    if (!directUrl && isFacebookUrl(downloadJob.url)) {
+      const embed = await probeFacebookEmbed(
+        downloadJob.url,
+        env.PIPED_API_TIMEOUT_MS
+      )
+      if (embed) {
+        if (imageMode && embed.imageUrl) {
+          directUrl = embed.imageUrl
+        } else if (!imageMode) {
+          const stream = pickFacebookStream(embed, maxHeight)
+          directUrl = stream?.url
+        }
+      }
+    }
+
+    if (directUrl) {
       const ext = imageMode ? '.jpg' : '.mp4'
       filePath = join(jobDir, `video${ext}`)
       logger.info('facebook direct download', { jobId, ext })
       await downloadFacebookDirect(
-        downloadJob.directStreamUrl,
+        directUrl,
         filePath,
         env.DOWNLOAD_TIMEOUT_MS
       )
@@ -217,7 +239,9 @@ export default async function downloadUrl(
               { maxHeight }
             )
           : await runYtdlpDownload(
-              downloadJob.url,
+              isFacebookUrl(downloadJob.url)
+                ? await resolveFacebookUrl(downloadJob.url)
+                : downloadJob.url,
               buildDownloadFlags(outputBase, downloadJob.audio, flagOpts),
               env.DOWNLOAD_TIMEOUT_MS,
               'download'

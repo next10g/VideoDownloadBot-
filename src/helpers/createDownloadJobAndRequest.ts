@@ -80,7 +80,7 @@ export default async function createDownloadJobAndRequest(
   try {
     const checkedUrl = await preflightUrl(url)
     await assertUserJobLimits(ctx.dbchat.telegramId, checkedUrl, audio)
-    if (!env.SKIP_YTDLP_PROBE) {
+    if (!env.SKIP_YTDLP_PROBE && !requestOpts.directStreamUrl) {
       try {
         await probeUrlMetadata(checkedUrl)
       } catch (probeError) {

@@ -67,12 +67,14 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
       facebook: offer.facebook,
     }
 
+    const jobUrl = offer.downloadUrl || checkedUrl
+
     if (!env.SHOW_FORMAT_MENU) {
       const defaultHeight = offer.videoHeights[0] ?? 720
       const fbStream = offer.facebook
         ? pickFacebookStream(offer.facebook, defaultHeight)
         : undefined
-      return createDownloadJobAndRequest(ctx, checkedUrl, {
+      return createDownloadJobAndRequest(ctx, jobUrl, {
         downloadMode: ctx.dbchat.audio ? DownloadMode.audio : DownloadMode.video,
         maxHeight: defaultHeight,
         audio: ctx.dbchat.audio,
@@ -80,7 +82,7 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
       })
     }
 
-    ctx.dbchat.pendingUrl = checkedUrl
+    ctx.dbchat.pendingUrl = jobUrl
     ctx.dbchat.pendingTitle = offer.title
     ctx.dbchat.pendingMediaProbe = storeProbe(offer)
     await ctx.dbchat.save()

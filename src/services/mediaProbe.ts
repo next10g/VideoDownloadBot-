@@ -4,11 +4,16 @@ import { isYoutubeUrl } from '@/helpers/youtubeUrl'
 import logger from '@/lib/logger'
 import { ValidationError } from '@/lib/errors'
 import {
+  probeFacebookByContentId,
   probeFacebookEmbed,
   type FacebookEmbedResult,
 } from '@/services/facebookEmbed'
+import {
+  facebookIdFromYtdlpError,
+  resolveFacebookUrl,
+} from '@/services/resolveFacebookUrl'
 import { buildProbeFlags } from '@/services/ytdlpOptions'
-import { runYtdlpJson } from '@/services/ytdlpRunner'
+import { formatYtdlpError, runYtdlpJson } from '@/services/ytdlpRunner'
 import type { YtDlpMetadata } from '@/services/ytdlpTypes'
 
 export interface MediaFormatOffer {
@@ -19,6 +24,8 @@ export interface MediaFormatOffer {
   hasImage: boolean
   hasAudio: boolean
   facebook?: FacebookEmbedResult
+  /** Canonical URL for yt-dlp when share link was expanded. */
+  downloadUrl?: string
 }
 
 function parseHeightFromFormat(format: Record<string, unknown>): number {
@@ -87,49 +94,84 @@ function offerFromFacebook(embed: FacebookEmbedResult): MediaFormatOffer {
     hasImage: Boolean(embed.imageUrl),
     hasAudio: unique.length > 0,
     facebook: embed,
+    downloadUrl: embed.resolvedUrl,
   }
 }
 
-function offerFromYtdlp(meta: YtDlpMetadata): MediaFormatOffer {
+function offerFromYtdlp(meta: YtDlpMetadata, downloadUrl?: string): MediaFormatOffer {
   const { heights, hasAudio, hasImage } = heightsFromYtdlp(meta)
+  const thumb = meta.thumbnails?.[0]?.url
   return {
     title: meta.title || 'Video',
     description: meta.description,
     videoHeights: heights,
-    hasImage,
+    hasImage: hasImage || Boolean(thumb),
     hasAudio: hasAudio || Boolean(meta.ext?.match(/m4a|mp3|opus/i)),
+    downloadUrl,
   }
+}
+
+async function probeYtdlp(url: string): Promise<MediaFormatOffer> {
+  const raw = await runYtdlpJson(
+    url,
+    buildProbeFlags(),
+    env.YTDLP_PROBE_TIMEOUT_MS,
+    'probe'
+  )
+  const meta = raw as YtDlpMetadata
+  if (meta._type === 'playlist' && meta.entries?.[0]) {
+    return offerFromYtdlp(meta.entries[0], url)
+  }
+  return offerFromYtdlp(meta, url)
 }
 
 /** Probe link and decide which download buttons to show (no cookies). */
 export async function probeMediaOffer(url: string): Promise<MediaFormatOffer> {
+  let downloadUrl = url
   if (isFacebookUrl(url)) {
+    downloadUrl = await resolveFacebookUrl(url)
     const embed = await probeFacebookEmbed(url, env.PIPED_API_TIMEOUT_MS)
     if (embed && (embed.streams.length > 0 || embed.imageUrl)) {
       return offerFromFacebook(embed)
     }
-    logger.warn('facebook embed empty, trying yt-dlp probe', { url })
+    logger.warn('facebook embed empty, trying yt-dlp probe', {
+      url,
+      resolvedUrl: downloadUrl,
+    })
   }
 
   try {
-    const raw = await runYtdlpJson(
-      url,
-      buildProbeFlags(),
-      env.YTDLP_PROBE_TIMEOUT_MS,
-      'probe'
-    )
-    const meta = raw as YtDlpMetadata
-    if (meta._type === 'playlist' && meta.entries?.[0]) {
-      return offerFromYtdlp(meta.entries[0])
-    }
-    return offerFromYtdlp(meta)
+    return await probeYtdlp(downloadUrl)
   } catch (error) {
-    if (isFacebookUrl(url)) {
-      throw new ValidationError(
-        'Facebook link could not be read from this server (try a public post or Reel link)',
-        'facebook_failed'
-      )
+    if (!isFacebookUrl(url)) {
+      throw error
     }
-    throw error
+
+    const message = formatYtdlpError(error)
+    const contentId = facebookIdFromYtdlpError(message)
+    if (contentId) {
+      const byId = await probeFacebookByContentId(
+        contentId,
+        url,
+        env.PIPED_API_TIMEOUT_MS
+      )
+      if (byId) {
+        logger.info('facebook probe ok via content id', { contentId })
+        return offerFromFacebook(byId)
+      }
+    }
+
+    if (downloadUrl !== url) {
+      try {
+        return await probeYtdlp(downloadUrl)
+      } catch {
+        // fall through
+      }
+    }
+
+    throw new ValidationError(
+      'Facebook link could not be read from this server (public post/Reel only; private groups need login)',
+      'facebook_failed'
+    )
   }
 }

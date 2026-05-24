@@ -44,9 +44,10 @@ export async function handleFormatChoice(ctx: Context) {
 
   const probe = loadProbe(ctx.dbchat.pendingMediaProbe)
   const directStreamUrl = resolveDirectStream(parsed, probe)
+  const jobUrl = probe?.downloadUrl || probe?.facebook?.resolvedUrl || url
 
   try {
-    return createDownloadJobAndRequest(ctx, url, {
+    return createDownloadJobAndRequest(ctx, jobUrl, {
       downloadMode: parsed.mode,
       maxHeight: parsed.maxHeight,
       audio: parsed.mode === DownloadMode.audio,
