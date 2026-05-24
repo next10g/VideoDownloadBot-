@@ -2,16 +2,18 @@ import { readFile, readdir } from 'fs/promises'
 import { join } from 'path'
 import { fetchImageToFile } from '@/helpers/fetchImageToFile'
 import { collectImageUrlsFromInfo } from '@/helpers/extractImageUrlsFromInfo'
+import { scrapeCarouselFromPostPage } from '@/helpers/instagramCarouselExtract'
 import { scrapeAllInstagramImages } from '@/helpers/instagramScrape'
 import {
   normalizeMediaUrl,
   upscaleInstagramCdnUrl,
 } from '@/helpers/normalizeMediaUrl'
 import { isInstagramUrl } from '@/helpers/instagramUrl'
+import { resolveDownloadedMediaPath } from '@/helpers/resolveDownloadedFile'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
-import { buildDownloadFlags, SOCIAL_IMAGE_FORMAT } from '@/services/ytdlpOptions'
-import { runYtdlpDownload } from '@/services/ytdlpRunner'
+import { buildDownloadFlags, buildProbeFlags, SOCIAL_IMAGE_FORMAT } from '@/services/ytdlpOptions'
+import { runYtdlpDownload, runYtdlpJson } from '@/services/ytdlpRunner'
 import type { YtDlpMetadata } from '@/services/ytdlpTypes'
 
 const IG_ANDROID_UA =
@@ -103,6 +105,80 @@ async function fetchUrlsToDir(
   return paths
 }
 
+async function listYtdlpCarouselEntryUrls(postUrl: string): Promise<string[]> {
+  try {
+    const meta = (await runYtdlpJson(
+      postUrl,
+      {
+        ...buildProbeFlags(postUrl),
+        flatPlaylist: true,
+        skipDownload: true,
+        ignoreNoFormatsError: true,
+      },
+      Math.min(env.YTDLP_PROBE_TIMEOUT_MS, 45_000),
+      'ig-carousel-flat'
+    )) as YtDlpMetadata
+
+    const urls: string[] = []
+    for (const entry of meta.entries || []) {
+      const row = entry as YtDlpMetadata & {
+        webpage_url?: string
+        url?: string
+      }
+      const u = row.webpage_url || row.url || ''
+      if (/\/p\//i.test(u)) {
+        urls.push(u.split('?')[0])
+      }
+    }
+    if (urls.length > 1) {
+      logger.info('instagram yt-dlp carousel entries', {
+        postUrl,
+        count: urls.length,
+      })
+    }
+    return urls
+  } catch {
+    return []
+  }
+}
+
+async function downloadCarouselEntryPosts(
+  entryUrls: string[],
+  postUrl: string,
+  jobDir: string
+): Promise<string[]> {
+  const paths: string[] = []
+  const limit = Math.min(entryUrls.length, env.ALBUM_MAX_IMAGES)
+  for (let i = 0; i < limit; i++) {
+    const base = `entry${i + 1}`
+    const outputBase = join(jobDir, base)
+    try {
+      await runYtdlpDownload(
+        entryUrls[i],
+        {
+          ...buildDownloadFlags(outputBase, false, {
+            imageMode: true,
+            sourceUrl: postUrl,
+          }),
+          format: SOCIAL_IMAGE_FORMAT,
+          writeInfoJson: false,
+          noPlaylist: true,
+        },
+        env.DOWNLOAD_TIMEOUT_MS,
+        `ig-entry-${i + 1}`
+      )
+      paths.push(await resolveDownloadedMediaPath(jobDir, base, true))
+    } catch (error) {
+      logger.warn('instagram carousel entry skip', {
+        index: i,
+        url: entryUrls[i],
+        detail: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+  return paths
+}
+
 async function downloadViaYtdlpPost(
   postUrl: string,
   jobDir: string,
@@ -147,15 +223,61 @@ async function downloadViaYtdlpPost(
   return []
 }
 
+async function tryCarouselDownload(
+  postUrl: string,
+  jobDir: string
+): Promise<string[]> {
+  const pageSlides = await scrapeCarouselFromPostPage(postUrl)
+  if (pageSlides.length > 1) {
+    const fetched = await fetchUrlsToDir(
+      pageSlides.slice(0, env.ALBUM_MAX_IMAGES),
+      postUrl,
+      jobDir
+    )
+    if (fetched.length > 1) {
+      return fetched
+    }
+  }
+
+  const entryUrls = await listYtdlpCarouselEntryUrls(postUrl)
+  if (entryUrls.length > 1) {
+    const perEntry = await downloadCarouselEntryPosts(entryUrls, postUrl, jobDir)
+    if (perEntry.length > 1) {
+      return perEntry
+    }
+  }
+
+  return []
+}
+
 /** Download IG photo(s) via yt-dlp + full-res CDN fetch. */
 export async function downloadInstagramPostImages(
   postUrl: string,
   jobDir: string,
   expectCarousel = false
 ): Promise<string[]> {
+  if (expectCarousel) {
+    const carousel = await tryCarouselDownload(postUrl, jobDir)
+    if (carousel.length > 1) {
+      logger.info('instagram post download ok', {
+        postUrl,
+        count: carousel.length,
+        carousel: true,
+      })
+      return carousel
+    }
+  }
+
   let paths = await downloadViaYtdlpPost(postUrl, jobDir, 'ig-post')
 
-  if (paths.length <= 1 && (expectCarousel || paths.length === 0)) {
+  if (paths.length <= 1) {
+    const carousel = await tryCarouselDownload(postUrl, jobDir)
+    if (carousel.length > paths.length) {
+      paths = carousel
+    }
+  }
+
+  if (paths.length <= 1) {
     const scraped = await scrapeAllInstagramImages(postUrl)
     if (scraped.length > paths.length) {
       const fetched = await fetchUrlsToDir(

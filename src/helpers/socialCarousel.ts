@@ -1,4 +1,5 @@
 import { filterSocialImageUrls } from '@/helpers/filterSocialImageUrls'
+import { scrapeCarouselFromPostPage } from '@/helpers/instagramCarouselExtract'
 import { scrapeAllInstagramImages } from '@/helpers/instagramScrape'
 import { isFacebookUrl } from '@/helpers/facebookUrl'
 import { isInstagramUrl, isInstagramReelUrl } from '@/helpers/instagramUrl'
@@ -86,6 +87,11 @@ export async function probeSocialImageUrls(url: string): Promise<string[]> {
 
 /** Scrape + yt-dlp metadata — best effort carousel URL list for probe/menu. */
 export async function probeInstagramImageUrls(url: string): Promise<string[]> {
+  const pageCarousel = await scrapeCarouselFromPostPage(url)
+  if (pageCarousel.length > 1) {
+    return pageCarousel
+  }
+
   let urls = await probeSocialImageUrls(url)
   if (urls.length > 1) {
     return urls

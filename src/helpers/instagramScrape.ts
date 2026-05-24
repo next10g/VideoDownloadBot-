@@ -1,3 +1,4 @@
+import { scrapeCarouselFromPostPage } from '@/helpers/instagramCarouselExtract'
 import { filterSocialImageUrls } from '@/helpers/filterSocialImageUrls'
 import { normalizeMediaUrl } from '@/helpers/normalizeMediaUrl'
 import { isInstagramReelUrl } from '@/helpers/instagramUrl'
@@ -174,6 +175,11 @@ function parsePostImages(html: string): string[] {
 export async function scrapeAllInstagramImages(postUrl: string): Promise<string[]> {
   if (isInstagramReelUrl(postUrl)) {
     return []
+  }
+
+  const fromPage = await scrapeCarouselFromPostPage(postUrl)
+  if (fromPage.length > 0) {
+    return fromPage.slice(0, env.ALBUM_MAX_IMAGES)
   }
 
   let raw: string[] = []
