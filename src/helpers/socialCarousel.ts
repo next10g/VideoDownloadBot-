@@ -1,10 +1,14 @@
 import { isFacebookUrl } from '@/helpers/facebookUrl'
 import { isInstagramUrl } from '@/helpers/instagramUrl'
+import logger from '@/lib/logger'
 import { extractAlbumImageUrls } from '@/services/albumExtract'
 import { buildProbeFlags } from '@/services/ytdlpOptions'
 import { runYtdlpJson } from '@/services/ytdlpRunner'
 import type { YtDlpMetadata } from '@/services/ytdlpTypes'
 import env from '@/helpers/env'
+
+const IG_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 
 export function isSocialCarouselUrl(url: string): boolean {
   return isInstagramUrl(url) || isFacebookUrl(url)
@@ -32,41 +36,76 @@ function probeTimeoutMs(url: string): number {
   return env.YTDLP_PROBE_TIMEOUT_MS
 }
 
-function instagramPhotoProbeFlags(url: string) {
-  return {
+/** Public IG embed page — fallback when yt-dlp returns "no video in this post". */
+async function scrapeInstagramEmbedImages(postUrl: string): Promise<string[]> {
+  const base = postUrl.split('?')[0].replace(/\/$/, '')
+  const embedUrl = `${base}/embed/captioned/`
+  const res = await fetch(embedUrl, {
+    signal: AbortSignal.timeout(20_000),
+    headers: {
+      'User-Agent': IG_UA,
+      Accept: 'text/html',
+      Referer: 'https://www.instagram.com/',
+    },
+  })
+  if (!res.ok) {
+    return []
+  }
+  const html = await res.text()
+  const urls = new Set<string>()
+  const patterns = [
+    /"display_url":"([^"]+)"/g,
+    /"src":"(https:\\\/\\\/[^"]+\.(?:jpg|jpeg|webp)[^"]*)"/gi,
+  ]
+  for (const re of patterns) {
+    let match: RegExpExecArray | null
+    while ((match = re.exec(html))) {
+      const raw = match[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/')
+      if (raw.startsWith('http')) {
+        urls.add(raw)
+      }
+    }
+  }
+  return [...urls]
+}
+
+async function probeWithYtdlp(url: string, timeout: number): Promise<string[]> {
+  const flags = {
     ...buildProbeFlags(url),
-    noPlaylist: false,
     ignoreNoFormatsError: true,
   }
+  const raw = await runYtdlpJson(url, flags, timeout, 'probe')
+  return extractAlbumImageUrls(raw)
 }
 
 /** Probe IG/FB post and return direct image URLs (carousel or single photo). */
 export async function probeSocialImageUrls(url: string): Promise<string[]> {
   const timeout = probeTimeoutMs(url)
+
   try {
-    const raw = await runYtdlpJson(url, buildProbeFlags(url), timeout, 'probe')
-    const urls = extractAlbumImageUrls(raw)
+    const urls = await probeWithYtdlp(url, timeout)
     if (urls.length > 0) {
       return urls
     }
-  } catch {
-    // try relaxed flags for photo-only posts
+  } catch (error) {
+    logger.warn('social ytdlp probe failed', {
+      url,
+      detail: error instanceof Error ? error.message : String(error),
+    })
   }
 
   if (isInstagramUrl(url)) {
     try {
-      const raw = await runYtdlpJson(
-        url,
-        instagramPhotoProbeFlags(url),
-        timeout,
-        'probe'
-      )
-      const urls = extractAlbumImageUrls(raw)
-      if (urls.length > 0) {
-        return urls
+      const scraped = await scrapeInstagramEmbedImages(url)
+      if (scraped.length > 0) {
+        logger.info('instagram embed scrape ok', { url, count: scraped.length })
+        return scraped
       }
-    } catch {
-      // fall through
+    } catch (error) {
+      logger.warn('instagram embed scrape failed', {
+        url,
+        detail: error instanceof Error ? error.message : String(error),
+      })
     }
   }
 

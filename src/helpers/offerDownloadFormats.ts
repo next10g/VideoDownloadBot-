@@ -230,6 +230,24 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
       return
     }
     const detail = error instanceof Error ? error.message : String(error)
+    if (isInstagramUrl(url) || isFacebookUrl(url)) {
+      try {
+        const { probeSocialImageUrls } = await import('@/helpers/socialCarousel')
+        const albumUrls = await probeSocialImageUrls(url)
+        if (albumUrls.length > 0) {
+          const mode =
+            albumUrls.length > 1 ? DownloadMode.album : DownloadMode.image
+          return createDownloadJobAndRequest(ctx, rawUrl, {
+            downloadMode: mode,
+            maxHeight: 0,
+            audio: false,
+            albumUrls,
+          })
+        }
+      } catch {
+        // fall through
+      }
+    }
     const ytdlpKey = ytdlpErrorI18nKey(detail)
     if (ytdlpKey) {
       await editor.editMessage(ctx.i18n.t(ytdlpKey))

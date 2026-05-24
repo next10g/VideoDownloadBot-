@@ -143,16 +143,15 @@ export async function initYtdlpOptions(): Promise<void> {
 }
 
 export function buildProbeFlags(sourceUrl?: string): YtDlpFlags {
+  const socialCarousel =
+    Boolean(
+      sourceUrl &&
+        (isInstagramUrl(sourceUrl) || isFacebookUrl(sourceUrl))
+    )
   const flags: YtDlpFlags = {
-    ...baseFlags(),
+    ...baseFlags(undefined, { allowMultiEntryPlaylist: socialCarousel }),
     skipDownload: true,
     dumpSingleJson: true,
-  }
-  if (
-    sourceUrl &&
-    (isInstagramUrl(sourceUrl) || isFacebookUrl(sourceUrl))
-  ) {
-    flags.noPlaylist = false
   }
   if (sourceUrl && isFacebookUrl(sourceUrl)) {
     flags.addHeader = FB_HEADERS
@@ -227,11 +226,13 @@ export function buildDownloadFlags(
   return flags
 }
 
-function baseFlags(overrides?: DownloadFlagOverrides): YtDlpFlags {
+function baseFlags(
+  overrides?: DownloadFlagOverrides,
+  opts?: { allowMultiEntryPlaylist?: boolean }
+): YtDlpFlags {
   const flags: YtDlpFlags = {
     noWarnings: true,
     noCheckCertificate: true,
-    noPlaylist: true,
     maxFilesize,
     noProgress: true,
     noCacheDir: true,
@@ -246,6 +247,11 @@ function baseFlags(overrides?: DownloadFlagOverrides): YtDlpFlags {
     hlsPreferNative: true,
     forceIpv4: true,
     extractorArgs: overrides?.extractorArgs ?? defaultYoutubeExtractorArgs(),
+  }
+  if (opts?.allowMultiEntryPlaylist) {
+    flags.yesPlaylist = true
+  } else {
+    flags.noPlaylist = true
   }
   const jsRuntimes = getYtdlpJsRuntimesFlag()
   if (jsRuntimes) {

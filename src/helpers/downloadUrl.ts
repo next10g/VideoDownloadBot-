@@ -161,11 +161,7 @@ export default async function downloadUrl(
 
     const isSocial = isSocialCarouselUrl(downloadJob.url)
 
-    if (
-      !filePath &&
-      isSocial &&
-      (imageMode || albumMode || downloadJob.albumUrls?.length)
-    ) {
+    if (!filePath && isSocial) {
       const imageUrls =
         downloadJob.albumUrls?.filter(Boolean).length
           ? downloadJob.albumUrls!
