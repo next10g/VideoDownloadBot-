@@ -31,6 +31,7 @@
     "mongoose": "^6.1.1",
     "mongoose-findorcreate": "^3.0.0",
     "sharp": "^0.33.5",
+    "undici": "^6.25.0",
     "youtube-dl-exec": "^3.1.7"
   },
   "devDependencies": {

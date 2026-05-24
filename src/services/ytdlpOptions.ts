@@ -1,4 +1,5 @@
 import env from '@/helpers/env'
+import { isFacebookUrl } from '@/helpers/facebookUrl'
 import { getFfmpegPath } from '@/services/ffmpegPath'
 import { resolveCookiePool, shouldLoadYoutubeCookiePool } from '@/services/ytdlpCookies'
 import { getYtdlpJsRuntimesFlag, resolveNodeForYtdlp } from '@/services/ytdlpNodeRuntime'
@@ -21,6 +22,8 @@ export interface DownloadFlagOverrides {
   relaxedFormat?: boolean
   maxHeight?: number
   imageMode?: boolean
+  /** Facebook / TikTok share links need site-specific extractor args. */
+  sourceUrl?: string
 }
 
 function videoFormat(
@@ -66,12 +69,15 @@ function defaultYoutubeExtractorArgs(): string {
   return `youtube:player_client=android_vr,web_embedded,ios,android,tv;player_skip=webpage,configs${poSuffix}`
 }
 
-function socialExtractorArgs(): string {
-  return [
+function socialExtractorArgs(forFacebook = false): string {
+  const parts = [
     defaultYoutubeExtractorArgs(),
     'tiktok:api_hostname=api16-normal-c-useast1a.tiktokv.com',
-    'facebook:player_skip=webpage',
-  ].join(';')
+  ]
+  if (forFacebook) {
+    parts.push('facebook:player_skip=webpage,webpage_skip=0')
+  }
+  return parts.join(';')
 }
 
 /** Call at startup — Node runtime + optional cookie pool for admin mode. */
@@ -104,10 +110,14 @@ export function buildDownloadFlags(
   const thumbs = !audio && !imageMode && !env.SKIP_THUMBNAILS
 
   const relaxed = overrides?.relaxedFormat ?? Boolean(overrides?.cookiesPath)
+  const forFacebook = overrides?.sourceUrl
+    ? isFacebookUrl(overrides.sourceUrl)
+    : false
   const flags: YtDlpFlags = {
     ...baseFlags({
       ...overrides,
-      extractorArgs: overrides?.extractorArgs ?? socialExtractorArgs(),
+      extractorArgs:
+        overrides?.extractorArgs ?? socialExtractorArgs(forFacebook),
     }),
     quiet: true,
     output: `${outputBase}.%(ext)s`,
@@ -144,8 +154,9 @@ function baseFlags(overrides?: DownloadFlagOverrides): YtDlpFlags {
     noCacheDir: true,
     noPart: true,
     concurrentFragments: 1,
-    retries: 3,
-    fragmentRetries: 3,
+    retries: 5,
+    fragmentRetries: 5,
+    extractorRetries: 3,
     socketTimeout: 30,
     matchFilter: env.YTDLP_MATCH_FILTER,
     abortOnUnavailableFragment: true,

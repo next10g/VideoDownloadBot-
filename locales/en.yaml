@@ -67,6 +67,8 @@ video_caption: |
 error_cannot_start_download: 😱 Couldn't start the download. Tap **Try again** or resend the link.
 error_invalid_url: 🔗 That doesn't look like a valid video link.
 error_cache_or_download_job: 😱 Something went wrong. Please try again.
+error_facebook_download: |
+  📘 Facebook blocked this link. Try «Copy link» from the app or a public post URL.
 error_video_download: 😓 Download failed. The source may be blocked.
 error_video_upload: 😓 Upload to Telegram failed. Try again shortly.
 error_unsupported_url: 🚫 This website isn't supported.

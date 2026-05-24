@@ -40,6 +40,13 @@ export function normalizeUrl(raw: string): string {
       return trimmed
     }
     url.hostname = url.hostname.toLowerCase().replace(/^www\./, '')
+    if (
+      url.hostname === 'facebook.com' ||
+      url.hostname === 'fb.com' ||
+      url.hostname === 'm.facebook.com'
+    ) {
+      url.hostname = 'www.facebook.com'
+    }
     expandShortHosts(url)
     for (const param of TRACKING_PARAMS) {
       url.searchParams.delete(param)

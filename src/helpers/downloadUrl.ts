@@ -174,6 +174,7 @@ export default async function downloadUrl(
     const flagOpts = {
       maxHeight,
       imageMode,
+      sourceUrl: downloadJob.url,
     }
 
     logger.info('download start', {

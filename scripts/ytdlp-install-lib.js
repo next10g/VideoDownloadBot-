@@ -255,10 +255,37 @@ function installPortablePython(projectRoot) {
   return wrapper
 }
 
+function upgradeExistingYtdlp(projectRoot) {
+  const script = scriptPath(projectRoot)
+  if (!fs.existsSync(script)) {
+    return
+  }
+  try {
+    console.log('Updating yt-dlp script from GitHub latest...')
+    download(SCRIPT_URL, script)
+    fs.chmodSync(script, 0o755)
+    console.log('yt-dlp script updated')
+  } catch (error) {
+    console.warn('yt-dlp script update skipped:', error.message)
+  }
+  const py = findPython310()
+  if (py) {
+    try {
+      execFileSync(py, ['-m', 'pip', 'install', '-U', 'yt-dlp'], {
+        stdio: 'inherit',
+        timeout: 300_000,
+      })
+    } catch {
+      // pip upgrade optional
+    }
+  }
+}
+
 function installYtdlp(projectRoot) {
   projectRoot = projectRoot || path.join(__dirname, '..')
   const existing = wrapperPath(projectRoot)
   if (canExecute(existing)) {
+    upgradeExistingYtdlp(projectRoot)
     console.log('yt-dlp already OK:', existing)
     return existing
   }

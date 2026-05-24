@@ -92,6 +92,15 @@ video_caption: |
 error_cannot_start_download: 😱 معرفتش أبدأ التحميل. دوس **جرّب تاني** أو ابعت اللينك مرة تانية.
 error_invalid_url: 🔗 اللينك مش مظبوط. ابعت لينك فيديو مباشر.
 error_cache_or_download_job: 😱 حصلت مشكلة وأنا بابدأ. جرّب تاني.
+error_facebook_download: |
+  📘 فيسبوك رفض الرابط (Cannot parse data).
+
+  جرّب:
+  • «Copy link» من التطبيق (مش Share فقط)
+  • لينك عام (مش جروب خاص)
+  • بعد تحديث yt-dlp على السيرفر
+
+  @Dev_Nour_M لو استمرّت المشكلة
 error_video_download: 😓 التحميل فشل. يمكن المصدر مقفول أو مش متاح.
 error_video_upload: 😓 الرفع على تيليجرام فشل. جرّب بعد شوية.
 error_unsupported_url: 🚫 الموقع ده مش مدعوم.

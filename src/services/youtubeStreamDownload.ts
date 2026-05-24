@@ -2,27 +2,8 @@ import { createWriteStream } from 'fs'
 import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
 import env from '@/helpers/env'
+import { createFetchAgent } from '@/helpers/loadUndici'
 import logger from '@/lib/logger'
-
-/** Node fetch uses undici; default connect timeout is 10s (too short on shared hosting). */
-function fetchDispatcher(timeoutMs: number): unknown | undefined {
-  try {
-    const { Agent } = require('undici') as {
-      Agent: new (opts: {
-        connectTimeout: number
-        headersTimeout: number
-        bodyTimeout: number
-      }) => unknown
-    }
-    return new Agent({
-      connectTimeout: timeoutMs,
-      headersTimeout: timeoutMs,
-      bodyTimeout: timeoutMs,
-    })
-  } catch {
-    return undefined
-  }
-}
 
 export function fetchErrorDetail(error: unknown): string {
   if (!(error instanceof Error)) {
@@ -43,7 +24,7 @@ export async function fetchJson<T>(
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    const dispatcher = fetchDispatcher(timeoutMs)
+    const dispatcher = createFetchAgent(timeoutMs)
     const response = await fetch(url, {
       signal: controller.signal,
       ...(dispatcher ? { dispatcher } : {}),
@@ -83,7 +64,7 @@ export async function downloadStreamToFile(
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    const dispatcher = fetchDispatcher(timeoutMs)
+    const dispatcher = createFetchAgent(timeoutMs)
     const response = await fetch(streamUrl, {
       signal: controller.signal,
       ...(dispatcher ? { dispatcher } : {}),

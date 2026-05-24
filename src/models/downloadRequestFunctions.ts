@@ -5,6 +5,7 @@ import DownloadJob from '@/models/DownloadJob'
 import DownloadJobStatus from '@/models/DownloadJobStatus'
 import MessageEditor from '@/helpers/MessageEditor'
 import { buildRetryKeyboard } from '@/helpers/progressKeyboard'
+import { isFacebookUrl } from '@/helpers/facebookUrl'
 import i18n from '@/helpers/i18n'
 import sendCompletedFile from '@/helpers/sendCompletedFile'
 import type { SendMediaOptions } from '@/helpers/sendMediaOptions'
@@ -32,7 +33,12 @@ export async function findOrCreateDownloadRequest(
       break
     case DownloadJobStatus.failedDownload:
       await editor.editMessage(
-        i18n.t(doc.language, 'error_video_download'),
+        i18n.t(
+          doc.language,
+          isFacebookUrl(downloadJob.url)
+            ? 'error_facebook_download'
+            : 'error_video_download'
+        ),
         buildRetryKeyboard(doc.language)
       )
       break

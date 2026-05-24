@@ -1,4 +1,5 @@
 import env from '@/helpers/env'
+import { createFetchAgent, loadUndici } from '@/helpers/loadUndici'
 import logger from '@/lib/logger'
 
 let initialized = false
@@ -10,43 +11,20 @@ export function initYoutubeFetchAgent(): void {
   }
   initialized = true
   const timeoutMs = env.PIPED_API_TIMEOUT_MS
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const undici = require('node:undici') as {
-      Agent: new (opts: Record<string, number>) => unknown
-      setGlobalDispatcher: (d: unknown) => void
-    }
-    const { Agent, setGlobalDispatcher } = undici
-    setGlobalDispatcher(
-      new Agent({
+  const undici = loadUndici()
+  if (!undici?.setGlobalDispatcher) {
+    logger.warn('youtube fetch agent not configured', {
+      detail: 'npm package undici missing — run npm install',
+    })
+    return
+  }
+  undici.setGlobalDispatcher(
+    createFetchAgent(timeoutMs) ??
+      new undici.Agent({
         connectTimeout: timeoutMs,
         headersTimeout: timeoutMs,
         bodyTimeout: timeoutMs,
       })
-    )
-    logger.info('youtube fetch agent', { connectTimeoutMs: timeoutMs })
-  } catch (error) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const undici = require('undici') as {
-        Agent: new (opts: Record<string, number>) => unknown
-        setGlobalDispatcher: (d: unknown) => void
-      }
-      const { Agent, setGlobalDispatcher } = undici
-      setGlobalDispatcher(
-        new Agent({
-          connectTimeout: timeoutMs,
-          headersTimeout: timeoutMs,
-          bodyTimeout: timeoutMs,
-        })
-      )
-      logger.info('youtube fetch agent', { connectTimeoutMs: timeoutMs })
-    } catch (inner) {
-      logger.warn('youtube fetch agent not configured', {
-        detail:
-          inner instanceof Error ? inner.message : String(inner),
-        cause: error instanceof Error ? error.message : String(error),
-      })
-    }
-  }
+  )
+  logger.info('youtube fetch agent', { connectTimeoutMs: timeoutMs })
 }
