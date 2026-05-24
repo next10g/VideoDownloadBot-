@@ -59,7 +59,8 @@ export async function fetchJson<T>(
 export async function downloadStreamToFile(
   streamUrl: string,
   destPath: string,
-  timeoutMs: number
+  timeoutMs: number,
+  referer = 'https://www.youtube.com/'
 ): Promise<void> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
@@ -70,7 +71,7 @@ export async function downloadStreamToFile(
       ...(dispatcher ? { dispatcher } : {}),
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; VideoDownloadBot/1.0)',
-        Referer: 'https://www.youtube.com/',
+        Referer: referer,
       },
       redirect: 'follow',
     } as RequestInit)

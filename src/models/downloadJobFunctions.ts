@@ -5,6 +5,7 @@ export interface DownloadJobOptions {
   audio: boolean
   downloadMode?: DownloadMode
   maxHeight?: number
+  directStreamUrl?: string
 }
 
 export function findOrCreateDownloadJob(
@@ -20,7 +21,13 @@ export function findOrCreateDownloadJob(
 
   return DownloadJobModel.findOrCreate(
     { url, audio, downloadMode, maxHeight },
-    { originalChatId, originalMessageId, downloadMode, maxHeight }
+    {
+      originalChatId,
+      originalMessageId,
+      downloadMode,
+      maxHeight,
+      directStreamUrl: options.directStreamUrl,
+    }
   )
 }
 

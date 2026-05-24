@@ -41,6 +41,10 @@ export default class DownloadJob extends FindOrCreate {
   /** Video max height (360/480/720/1080). 0 = server default. */
   @prop({ default: 0, index: true })
   maxHeight!: number
+
+  @prop()
+  directStreamUrl?: string
+
   @prop({
     required: true,
     index: true,

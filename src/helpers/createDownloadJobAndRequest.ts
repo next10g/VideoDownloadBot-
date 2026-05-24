@@ -52,6 +52,7 @@ export default async function createDownloadJobAndRequest(
   ctx.dbchat.lastUrl = url
   ctx.dbchat.pendingUrl = undefined
   ctx.dbchat.pendingTitle = undefined
+  ctx.dbchat.pendingMediaProbe = undefined
   await ctx.dbchat.save()
 
   if (isOnCooldown(ctx.dbchat.telegramId)) {
@@ -145,6 +146,7 @@ export default async function createDownloadJobAndRequest(
         audio,
         downloadMode: requestOpts.downloadMode,
         maxHeight: requestOpts.maxHeight,
+        directStreamUrl: requestOpts.directStreamUrl,
       },
       ctx.dbchat.telegramId,
       statusMsg.message_id

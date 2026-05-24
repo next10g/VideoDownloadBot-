@@ -1,15 +1,16 @@
 import env from '@/helpers/env'
-import { buildFormatKeyboard } from '@/helpers/formatKeyboard'
+import { buildFormatKeyboardFromProbe } from '@/helpers/formatKeyboard'
 import createDownloadJobAndRequest from '@/helpers/createDownloadJobAndRequest'
 import { logSubmittedLink } from '@/helpers/logUserLink'
+import { storeProbe } from '@/helpers/pendingMediaProbe'
 import MessageEditor from '@/helpers/MessageEditor'
 import { DownloadMode } from '@/models/DownloadMode'
 import Context from '@/models/Context'
 import { preflightUrl } from '@/services/urlPreflight'
 import { normalizeUrl } from '@/services/urlNormalize'
-import { probeUrlMetadata } from '@/services/ytdlpProbe'
+import { probeMediaOffer } from '@/services/mediaProbe'
+import { pickFacebookStream } from '@/services/facebookEmbed'
 import { isValidationError } from '@/lib/errors'
-import logger from '@/lib/logger'
 import report from '@/helpers/report'
 import {
   blockedUserMessage,
@@ -53,44 +54,51 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
 
   try {
     const checkedUrl = await preflightUrl(url)
-    let title = ''
-    if (!env.SKIP_YTDLP_PROBE) {
-      try {
-        const meta = await probeUrlMetadata(checkedUrl)
-        title = meta.title || ''
-      } catch (probeError) {
-        if (!env.SOFT_YTDLP_PROBE || !isValidationError(probeError)) {
-          throw probeError
-        }
-        logger.warn('soft probe for format menu', {
-          url: checkedUrl,
-          detail:
-            probeError instanceof Error ? probeError.message : String(probeError),
-        })
-      }
+    const offer = await probeMediaOffer(checkedUrl)
+
+    await logSubmittedLink(ctx, checkedUrl, { title: offer.title })
+
+    const stored = {
+      title: offer.title,
+      description: offer.description,
+      videoHeights: offer.videoHeights,
+      hasImage: offer.hasImage,
+      hasAudio: offer.hasAudio,
+      facebook: offer.facebook,
     }
 
-    await logSubmittedLink(ctx, checkedUrl, { title })
-
     if (!env.SHOW_FORMAT_MENU) {
+      const defaultHeight = offer.videoHeights[0] ?? 720
+      const fbStream = offer.facebook
+        ? pickFacebookStream(offer.facebook, defaultHeight)
+        : undefined
       return createDownloadJobAndRequest(ctx, checkedUrl, {
         downloadMode: ctx.dbchat.audio ? DownloadMode.audio : DownloadMode.video,
-        maxHeight: 720,
+        maxHeight: defaultHeight,
         audio: ctx.dbchat.audio,
+        directStreamUrl: fbStream?.url,
       })
     }
 
     ctx.dbchat.pendingUrl = checkedUrl
-    ctx.dbchat.pendingTitle = title
+    ctx.dbchat.pendingTitle = offer.title
+    ctx.dbchat.pendingMediaProbe = storeProbe(offer)
     await ctx.dbchat.save()
 
-    const prompt = title
-      ? ctx.i18n.t('format_choose_with_title', {
-          title: title.slice(0, 80),
-        })
-      : ctx.i18n.t('format_choose')
+    let promptKey = 'format_choose'
+    if (offer.videoHeights.length === 0 && offer.hasImage) {
+      promptKey = 'format_image_only'
+    } else if (offer.videoHeights.length > 0 && !offer.hasImage) {
+      promptKey = 'format_video_only'
+    }
 
-    await editor.editMessage(prompt, buildFormatKeyboard(ctx))
+    const prompt = offer.title
+      ? ctx.i18n.t('format_choose_with_title', {
+          title: offer.title.slice(0, 80),
+        })
+      : ctx.i18n.t(promptKey)
+
+    await editor.editMessage(prompt, buildFormatKeyboardFromProbe(ctx, stored))
   } catch (error) {
     if (isValidationError(error)) {
       await editor.editMessage(validationMessage(ctx, error))

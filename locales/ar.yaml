@@ -31,6 +31,10 @@ help: |
   المطور: <b>Nour Mohamed</b> — @Dev_Nour_M
 format_choose: |
   ✅ اللينك اتفحص. اختار نوع التحميل:
+format_image_only: |
+  🖼 المحتوى **صورة**. اضغط تحميل الصورة:
+format_video_only: |
+  🎬 فيديو — اختار الجودة المتاحة:
 format_choose_with_title: |
   ✅ <b>${title}</b>
 

@@ -20,6 +20,8 @@ help: |
 
   Developer: <b>Nour Mohamed</b> — @Dev_Nour_M
 format_choose: "✅ Link OK. Choose download type:"
+format_image_only: "🖼 This link is an image. Tap download image:"
+format_video_only: "🎬 Video — pick an available quality:"
 format_choose_with_title: "✅ <b>${title}</b>\n\nChoose download type:"
 btn_format_video: "🎬 Video ${height}p"
 btn_format_audio: "🎵 Audio only"

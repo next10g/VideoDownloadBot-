@@ -1,10 +1,29 @@
 import createDownloadJobAndRequest from '@/helpers/createDownloadJobAndRequest'
 import { parseFormatCallback } from '@/helpers/formatKeyboard'
+import { loadProbe } from '@/helpers/pendingMediaProbe'
 import { DownloadMode } from '@/models/DownloadMode'
+import { pickFacebookStream } from '@/services/facebookEmbed'
 import Context from '@/models/Context'
 import report from '@/helpers/report'
 import bot from '@/helpers/bot'
 import env from '@/helpers/env'
+
+function resolveDirectStream(
+  parsed: { mode: DownloadMode; maxHeight: number },
+  probe: ReturnType<typeof loadProbe>
+): string | undefined {
+  if (!probe?.facebook) {
+    return undefined
+  }
+  if (parsed.mode === DownloadMode.image && probe.facebook.imageUrl) {
+    return probe.facebook.imageUrl
+  }
+  if (parsed.mode === DownloadMode.video || parsed.mode === DownloadMode.audio) {
+    const stream = pickFacebookStream(probe.facebook, parsed.maxHeight || 720)
+    return stream?.url
+  }
+  return undefined
+}
 
 export async function handleFormatChoice(ctx: Context) {
   await ctx.answerCallbackQuery()
@@ -23,11 +42,15 @@ export async function handleFormatChoice(ctx: Context) {
     return ctx.reply(ctx.i18n.t('error_retry_no_url'))
   }
 
+  const probe = loadProbe(ctx.dbchat.pendingMediaProbe)
+  const directStreamUrl = resolveDirectStream(parsed, probe)
+
   try {
     return createDownloadJobAndRequest(ctx, url, {
       downloadMode: parsed.mode,
       maxHeight: parsed.maxHeight,
       audio: parsed.mode === DownloadMode.audio,
+      directStreamUrl,
     })
   } catch (error) {
     report(error, { ctx, location: 'handleFormatChoice' })

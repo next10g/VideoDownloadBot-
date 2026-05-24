@@ -19,7 +19,9 @@ import sendCompletedFile from '@/helpers/sendCompletedFile'
 import { createJobTempDir, removePathSafe } from '@/helpers/tempDir'
 import withTimeout from '@/helpers/withTimeout'
 import logger from '@/lib/logger'
+import { isFacebookUrl } from '@/helpers/facebookUrl'
 import { isYoutubeUrl } from '@/helpers/youtubeUrl'
+import { downloadFacebookDirect } from '@/services/facebookEmbed'
 import { buildDownloadFlags } from '@/services/ytdlpOptions'
 import { runYoutubeDownload } from '@/services/youtubeDownload'
 import { runYtdlpDownload } from '@/services/ytdlpRunner'
@@ -183,46 +185,70 @@ export default async function downloadUrl(
       jobDir,
       mode: downloadJob.downloadMode,
       maxHeight,
-    })
-    const ytdlpResult =
-      isYoutubeUrl(downloadJob.url) && !imageMode
-        ? await runYoutubeDownload(
-            downloadJob.url,
-            outputBase,
-            downloadJob.audio,
-            jobId,
-            env.DOWNLOAD_TIMEOUT_MS,
-            { maxHeight }
-          )
-        : await runYtdlpDownload(
-            downloadJob.url,
-            buildDownloadFlags(outputBase, downloadJob.audio, flagOpts),
-            env.DOWNLOAD_TIMEOUT_MS,
-            'download'
-          )
-
-    const entries = await readdir(jobDir)
-    logger.info('download dir after yt-dlp', {
-      jobId: downloadJob.id,
-      entries,
-      stderr: ytdlpResult.stderr.slice(0, 400),
+      direct: Boolean(downloadJob.directStreamUrl),
     })
 
-    const info = await readInfoJson(jobDir, 'video')
     let filePath: string
-    if (info) {
-      validateMetadata(info, downloadJob.url)
-      filePath = await resolveDownloadedPath(info, jobDir, 'video')
-    } else {
-      const found = await findMediaFile(jobDir, 'video', imageMode)
-      if (!found) {
-        const hint = ytdlpResult.stderr.slice(0, 300) || entries.join(', ') || 'empty'
-        if (isYoutubeBotBlock(hint)) {
-          throw new Error(hint)
-        }
-        throw new Error(`Download produced no file (${hint})`)
+    let info: YtDlpMetadata | undefined
+    let ytdlpResult = { stderr: '' }
+
+    if (downloadJob.directStreamUrl) {
+      const ext = imageMode ? '.jpg' : '.mp4'
+      filePath = join(jobDir, `video${ext}`)
+      logger.info('facebook direct download', { jobId, ext })
+      await downloadFacebookDirect(
+        downloadJob.directStreamUrl,
+        filePath,
+        env.DOWNLOAD_TIMEOUT_MS
+      )
+      info = {
+        title: 'Facebook',
+        ext: ext.replace('.', ''),
       }
-      filePath = found
+    } else {
+      ytdlpResult =
+        isYoutubeUrl(downloadJob.url) && !imageMode
+          ? await runYoutubeDownload(
+              downloadJob.url,
+              outputBase,
+              downloadJob.audio,
+              jobId,
+              env.DOWNLOAD_TIMEOUT_MS,
+              { maxHeight }
+            )
+          : await runYtdlpDownload(
+              downloadJob.url,
+              buildDownloadFlags(outputBase, downloadJob.audio, flagOpts),
+              env.DOWNLOAD_TIMEOUT_MS,
+              'download'
+            )
+
+      const entries = await readdir(jobDir)
+      logger.info('download dir after yt-dlp', {
+        jobId: downloadJob.id,
+        entries,
+        stderr: ytdlpResult.stderr.slice(0, 400),
+      })
+
+      info = await readInfoJson(jobDir, 'video')
+      if (info) {
+        validateMetadata(info, downloadJob.url)
+        filePath = await resolveDownloadedPath(info, jobDir, 'video')
+      } else {
+        const found = await findMediaFile(jobDir, 'video', imageMode)
+        if (!found) {
+          const hint =
+            ytdlpResult.stderr.slice(0, 300) || entries.join(', ') || 'empty'
+          if (isYoutubeBotBlock(hint)) {
+            throw new Error(hint)
+          }
+          if (isFacebookUrl(downloadJob.url) && hint.includes('Cannot parse')) {
+            throw new Error('facebook_parse')
+          }
+          throw new Error(`Download produced no file (${hint})`)
+        }
+        filePath = found
+      }
     }
     const fileSize = await assertFileWithinLimits(filePath)
     const description =

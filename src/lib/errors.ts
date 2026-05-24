@@ -12,6 +12,7 @@ export type ValidationErrorCode =
   | 'user_blocked'
   | 'suspicious_extractor'
   | 'youtube_bot'
+  | 'facebook_failed'
 
 export class ValidationError extends Error {
   constructor(

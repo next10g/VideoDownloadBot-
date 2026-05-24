@@ -69,16 +69,20 @@ function defaultYoutubeExtractorArgs(): string {
   return `youtube:player_client=android_vr,web_embedded,ios,android,tv;player_skip=webpage,configs${poSuffix}`
 }
 
-function socialExtractorArgs(forFacebook = false): string {
-  const parts = [
+const FB_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+
+function socialExtractorArgs(): string {
+  return [
     defaultYoutubeExtractorArgs(),
     'tiktok:api_hostname=api16-normal-c-useast1a.tiktokv.com',
-  ]
-  if (forFacebook) {
-    parts.push('facebook:player_skip=webpage,webpage_skip=0')
-  }
-  return parts.join(';')
+  ].join(';')
 }
+
+const FB_HEADERS = [
+  'Referer:https://www.facebook.com/',
+  `User-Agent:${FB_UA}`,
+]
 
 /** Call at startup — Node runtime + optional cookie pool for admin mode. */
 export async function initYtdlpOptions(): Promise<void> {
@@ -117,7 +121,7 @@ export function buildDownloadFlags(
     ...baseFlags({
       ...overrides,
       extractorArgs:
-        overrides?.extractorArgs ?? socialExtractorArgs(forFacebook),
+        overrides?.extractorArgs ?? socialExtractorArgs(),
     }),
     quiet: true,
     output: `${outputBase}.%(ext)s`,
@@ -139,6 +143,10 @@ export function buildDownloadFlags(
     }
   } else if (thumbs) {
     flags.writeThumbnail = true
+  }
+
+  if (forFacebook) {
+    flags.addHeader = FB_HEADERS
   }
 
   return flags

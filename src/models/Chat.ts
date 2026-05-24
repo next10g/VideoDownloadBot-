@@ -50,6 +50,10 @@ export class Chat extends FindOrCreate {
 
   @prop()
   pendingTitle?: string
+
+  /** JSON from probeMediaOffer (heights, facebook embed, etc.). */
+  @prop()
+  pendingMediaProbe?: string
 }
 
 const ChatModel = getModelForClass(Chat)
