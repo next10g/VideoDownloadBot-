@@ -17,6 +17,8 @@ const KEY_BY_CODE: Record<ValidationError['code'], string> = {
   suspicious_extractor: 'error_suspicious_source',
   youtube_bot: 'error_youtube_bot',
   facebook_failed: 'error_facebook_download',
+  instagram_restricted: 'error_instagram_restricted',
+  instagram_login: 'error_instagram_login',
 }
 
 export function validationMessage(ctx: Context, error: ValidationError): string {

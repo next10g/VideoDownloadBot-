@@ -13,6 +13,8 @@ export type ValidationErrorCode =
   | 'suspicious_extractor'
   | 'youtube_bot'
   | 'facebook_failed'
+  | 'instagram_restricted'
+  | 'instagram_login'
 
 export class ValidationError extends Error {
   constructor(

@@ -7,6 +7,7 @@ import { probePipedYoutube } from '@/services/pipedYoutube'
 import { useProxyYoutubeApis } from '@/services/youtubeBackend'
 import { isYoutubeBotBlock } from '@/services/ytdlpCookies'
 import { buildProbeFlags } from '@/services/ytdlpOptions'
+import { validationErrorFromYtdlp } from '@/helpers/ytdlpValidation'
 import { formatYtdlpError, runYtdlpJson } from '@/services/ytdlpRunner'
 import type { YtDlpMetadata } from '@/services/ytdlpTypes'
 
@@ -110,6 +111,10 @@ export async function probeUrlMetadata(url: string): Promise<YtDlpMetadata> {
       throw error
     }
     const message = formatYtdlpError(error)
+    const mapped = validationErrorFromYtdlp(message)
+    if (mapped) {
+      throw mapped
+    }
     if (message.includes('Unsupported URL')) {
       throw new ValidationError(message, 'unsupported')
     }

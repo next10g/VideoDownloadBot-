@@ -79,6 +79,15 @@ if (!run(nodeBin, ['scripts/ensure-ytdlp.js'])) {
   process.exit(1)
 }
 
+const ffmpegBin = path.join(process.cwd(), 'bin', 'ffmpeg')
+if (process.platform === 'linux' && !fs.existsSync(ffmpegBin)) {
+  const ffScript = path.join(__dirname, 'install-ffmpeg.sh')
+  if (fs.existsSync(ffScript)) {
+    console.log('bin/ffmpeg missing — trying static ffmpeg install...')
+    run('bash', [ffScript])
+  }
+}
+
 const buildScript = path.join(__dirname, 'hostinger-build.js')
 if (fs.existsSync(buildScript)) {
   if (!run(nodeBin, [buildScript])) {

@@ -126,7 +126,13 @@ async function deleteDocuments(
   }
 }
 
-function failureMessageKey(status: DownloadJobStatus): string {
+function failureMessageKey(
+  downloadJob: DocumentType<DownloadJob>,
+  status: DownloadJobStatus
+): string {
+  if (downloadJob.failureI18nKey?.trim()) {
+    return downloadJob.failureI18nKey.trim()
+  }
   switch (status) {
     case DownloadJobStatus.failedUpload:
       return 'error_video_upload'
@@ -159,7 +165,7 @@ export default async function updateDownloadRequests(
     await updateMessages(
       editors,
       chats,
-      failureMessageKey(downloadJob.status),
+      failureMessageKey(downloadJob, downloadJob.status),
       true
     )
     await deleteDocuments(downloadJob, requests)

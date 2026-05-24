@@ -63,4 +63,8 @@ export default class DownloadJob extends FindOrCreate {
   originalChatId!: number
   @prop({ required: true, index: true })
   originalMessageId!: number
+
+  /** Optional i18n key for failure message (e.g. Instagram audience lock). */
+  @prop({ default: '' })
+  failureI18nKey!: string
 }

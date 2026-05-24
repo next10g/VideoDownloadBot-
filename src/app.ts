@@ -61,6 +61,8 @@ import { initYtdlpOptions } from '@/services/ytdlpOptions'
 import startMongo from '@/helpers/startMongo'
 import { startTempMaintenance } from '@/helpers/tempMaintenance'
 import { TEMP_ROOT } from '@/helpers/tempDir'
+import { acquireInstanceLock, releaseInstanceLock } from '@/helpers/instanceLock'
+import { withTelegramRetry } from '@/helpers/telegramApiRetry'
 import logger from '@/lib/logger'
 import {
   gracefulCleanup,
@@ -91,6 +93,10 @@ async function runApp() {
 */
 
   await mkdir(TEMP_ROOT, { recursive: true })
+  const isPrimary = await acquireInstanceLock()
+  if (!isPrimary) {
+    return
+  }
   await startMongo()
   logger.info('mongo connected')
   await resolveFfmpegPath()
@@ -195,10 +201,12 @@ async function runApp() {
   })
 
   const webhookUrl = `${env.WEBHOOK_URL.replace(/\/$/, '')}${webhookPath}`
-  await bot.api.setWebhook(webhookUrl, {
-    secret_token: env.WEBHOOK_SECRET,
-    drop_pending_updates: true,
-  })
+  await withTelegramRetry('setWebhook', () =>
+    bot.api.setWebhook(webhookUrl, {
+      secret_token: env.WEBHOOK_SECRET,
+      drop_pending_updates: false,
+    })
+  )
 
   await new Promise<void>((resolve) => {
     httpServer!.listen(env.PORT, () => resolve())
@@ -225,6 +233,7 @@ async function shutdown(signal: string) {
     clearInterval(tempMaintenanceTimer)
   }
   downloadQueue.cancelCurrentJob()
+  await releaseInstanceLock()
   await gracefulCleanup(signal)
   await new Promise<void>((resolve) => {
     if (!httpServer) {

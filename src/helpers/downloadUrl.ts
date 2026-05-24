@@ -44,6 +44,7 @@ import { isInstagramUrl } from '@/helpers/instagramUrl'
 import { recordUserDownload } from '@/helpers/userDownloadStats'
 import { saveUserLink } from '@/helpers/userLibrary'
 import { resolveDownloadedMediaPath } from '@/helpers/resolveDownloadedFile'
+import { ytdlpErrorI18nKey } from '@/helpers/ytdlpUserMessage'
 
 function escapeTitle(title: string | undefined): string {
   return (title || '').replace('<', '&lt;').replace('>', '&gt;')
@@ -319,6 +320,12 @@ export default async function downloadUrl(
   } catch (error) {
     metrics.increment('failedDownloads')
     recordDownloadFailure(downloadJob.originalChatId)
+    if (error instanceof Error) {
+      const i18nKey = ytdlpErrorI18nKey(error.message)
+      if (i18nKey) {
+        downloadJob.failureI18nKey = i18nKey
+      }
+    }
     if (downloadJob.status === DownloadJobStatus.downloading) {
       if (error instanceof Error) {
         if (error.message.includes('Unsupported URL')) {

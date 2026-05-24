@@ -31,17 +31,18 @@ export async function findOrCreateDownloadRequest(
     case DownloadJobStatus.uploading:
       await editor.editMessage(i18n.t(doc.language, 'status_uploading'))
       break
-    case DownloadJobStatus.failedDownload:
+    case DownloadJobStatus.failedDownload: {
+      const failKey =
+        downloadJob.failureI18nKey?.trim() ||
+        (isFacebookUrl(downloadJob.url)
+          ? 'error_facebook_download'
+          : 'error_video_download')
       await editor.editMessage(
-        i18n.t(
-          doc.language,
-          isFacebookUrl(downloadJob.url)
-            ? 'error_facebook_download'
-            : 'error_video_download'
-        ),
+        i18n.t(doc.language, failKey),
         buildRetryKeyboard(doc.language)
       )
       break
+    }
     case DownloadJobStatus.failedUpload:
       await editor.editMessage(
         i18n.t(doc.language, 'error_video_upload'),
