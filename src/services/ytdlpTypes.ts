@@ -1,5 +1,6 @@
 export interface YtDlpMetadata {
   title?: string
+  description?: string
   ext?: string
   extractor?: string
   extractor_key?: string

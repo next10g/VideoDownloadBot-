@@ -1,5 +1,5 @@
 import Context from '@/models/Context'
-import createDownloadJobAndRequest from '@/helpers/createDownloadJobAndRequest'
+import offerDownloadFormats from '@/helpers/offerDownloadFormats'
 import report from '@/helpers/report'
 import { extractFirstUrl } from '@/services/urlNormalize'
 
@@ -13,7 +13,7 @@ export default function handleUrl(ctx: Context) {
     if (!url) {
       return ctx.replyWithLocalization('error_invalid_url')
     }
-    return createDownloadJobAndRequest(ctx, url)
+    return offerDownloadFormats(ctx, url)
   } catch (error) {
     report(error, { ctx, location: 'handleUrl' })
     return ctx.replyWithLocalization('error_cannot_start_download')

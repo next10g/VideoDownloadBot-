@@ -1,5 +1,6 @@
 import * as dotenv from 'dotenv'
 import { bool, cleanEnv, makeValidator, num, str } from 'envalid'
+import { normalizeApiUrlList } from '@/helpers/normalizeApiUrl'
 import { cwd } from 'process'
 import { resolve } from 'path'
 
@@ -9,10 +10,7 @@ const commaList = makeValidator<string[]>((input) => {
   if (!input || input.trim() === '') {
     return []
   }
-  return input
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
+  return normalizeApiUrlList(input.split(','))
 })
 
 // eslint-disable-next-line node/no-process-env
@@ -75,7 +73,15 @@ const env = cleanEnv(process.env, {
     desc: 'Optional Invidious API bases (comma-separated). Empty = built-in list',
   }),
   PIPED_API_TIMEOUT_MS: num({ default: 45_000 }),
-  YOUTUBE_MAX_HEIGHT: num({ default: 720 }),
+  YOUTUBE_MAX_HEIGHT: num({ default: 1080 }),
+  SHOW_FORMAT_MENU: bool({
+    default: true,
+    desc: 'Show quality/type buttons before each download',
+  }),
+  REFERRAL_ENABLED: bool({
+    default: true,
+    desc: 'Enable /refer and invite links',
+  }),
   YOUTUBE_USE_COOKIES: bool({
     default: false,
     desc: 'yt-dlp only: try admin cookies (not for public bots)',

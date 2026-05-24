@@ -4,6 +4,10 @@ import { GrammyError, InputFile } from 'grammy'
 import { Message } from '@grammyjs/types'
 import bot from '@/helpers/bot'
 import env from '@/helpers/env'
+import {
+  isImageMode,
+  type SendMediaOptions,
+} from '@/helpers/sendMediaOptions'
 import i18n from '@/helpers/i18n'
 import logger from '@/lib/logger'
 import { metrics } from '@/lib/metrics'
@@ -71,11 +75,12 @@ export default async function sendCompletedFile(
   chatId: number,
   messageId: number,
   language: string,
-  audio: boolean,
+  media: SendMediaOptions,
   title: string,
   file: string | InputFile,
   thumb?: InputFile | string
 ): Promise<string> {
+  const audio = media.audio
   const isCachedFileId =
     typeof file === 'string' && !file.includes('/') && !file.includes('\\')
 
@@ -85,7 +90,7 @@ export default async function sendCompletedFile(
       chatId,
       messageId,
       language,
-      audio,
+      media,
       title,
       file,
       thumb
@@ -109,22 +114,13 @@ export default async function sendCompletedFile(
     })
   }
 
-  const sendDocumentConfig = {
-    caption: i18n.t(language, 'video_caption', {
-      bot: bot.botInfo.username,
-      title: (title || '').replace('<', '&lt;').replace('>', '&gt;'),
-    }),
-    parse_mode: 'HTML' as const,
-    reply_to_message_id: messageId,
-    thumb: audio
-      ? undefined
-      : thumb instanceof InputFile
-        ? thumb
-        : thumb
-          ? new InputFile(thumb)
-          : undefined,
-    supports_streaming: true,
-  }
+  const sendDocumentConfig = buildCaptionConfig(
+    language,
+    messageId,
+    title,
+    media,
+    thumb
+  )
 
   const botToSend = videoUploadBot
   let lastError: unknown
@@ -137,7 +133,7 @@ export default async function sendCompletedFile(
         : sendDocumentConfig
     try {
       const sentMessage = await withTimeout(
-        sendOnce(botToSend, chatId, audio, uploadFile, config),
+        sendOnce(botToSend, chatId, media, uploadFile, config),
         env.UPLOAD_TIMEOUT_MS,
         'Telegram upload'
       )
@@ -173,28 +169,16 @@ async function sendCachedFileId(
   chatId: number,
   messageId: number,
   language: string,
-  audio: boolean,
+  media: SendMediaOptions,
   title: string,
   fileId: string,
   thumb?: InputFile | string
 ): Promise<string> {
-  const config = {
-    caption: i18n.t(language, 'video_caption', {
-      bot: bot.botInfo.username,
-      title: (title || '').replace('<', '&lt;').replace('>', '&gt;'),
-    }),
-    parse_mode: 'HTML' as const,
-    reply_to_message_id: messageId,
-    thumb: audio
-      ? undefined
-      : thumb instanceof InputFile
-        ? thumb
-        : thumb
-          ? new InputFile(thumb)
-          : undefined,
-  }
+  const config = buildCaptionConfig(language, messageId, title, media, thumb)
   try {
-    if (audio) {
+    if (isImageMode(media)) {
+      await bot.api.sendPhoto(chatId, fileId, config)
+    } else if (media.audio) {
       await bot.api.sendAudio(chatId, fileId, config)
     } else {
       await bot.api.sendVideo(chatId, fileId, config)
@@ -205,19 +189,52 @@ async function sendCachedFileId(
   return fileId
 }
 
+function buildCaptionConfig(
+  language: string,
+  messageId: number,
+  title: string,
+  media: SendMediaOptions,
+  thumb?: InputFile | string
+) {
+  return {
+    caption: i18n.t(language, 'video_caption', {
+      bot: bot.botInfo.username,
+      title: (title || '').replace('<', '&lt;').replace('>', '&gt;'),
+    }),
+    parse_mode: 'HTML' as const,
+    reply_to_message_id: messageId,
+    thumb:
+      media.audio || isImageMode(media)
+        ? undefined
+        : thumb instanceof InputFile
+          ? thumb
+          : thumb
+            ? new InputFile(thumb)
+            : undefined,
+    supports_streaming: !media.audio && !isImageMode(media),
+  }
+}
+
 async function sendOnce(
   botToSend: typeof videoUploadBot,
   chatId: number,
-  audio: boolean,
+  media: SendMediaOptions,
   file: InputFile | string,
   config: Parameters<typeof bot.api.sendVideo>[2]
 ): Promise<
-  Message.VideoMessage | Message.AudioMessage | Message.DocumentMessage
+  | Message.VideoMessage
+  | Message.AudioMessage
+  | Message.DocumentMessage
+  | Message.PhotoMessage
 > {
   try {
-    return audio
-      ? await botToSend.api.sendAudio(chatId, file, config)
-      : await botToSend.api.sendVideo(chatId, file, config)
+    if (isImageMode(media)) {
+      return botToSend.api.sendPhoto(chatId, file, config)
+    }
+    if (media.audio) {
+      return botToSend.api.sendAudio(chatId, file, config)
+    }
+    return botToSend.api.sendVideo(chatId, file, config)
   } catch (error) {
     if (error instanceof GrammyError && error.error_code === 429) {
       throw error
@@ -231,12 +248,16 @@ function extractFileId(
     | Message.VideoMessage
     | Message.AudioMessage
     | Message.DocumentMessage
+    | Message.PhotoMessage
 ): string | undefined {
   if ('video' in sentMessage) {
     return sentMessage.video.file_id
   }
   if ('audio' in sentMessage) {
     return sentMessage.audio.file_id
+  }
+  if ('photo' in sentMessage && sentMessage.photo.length > 0) {
+    return sentMessage.photo[sentMessage.photo.length - 1].file_id
   }
   if ('document' in sentMessage) {
     return sentMessage.document.file_id

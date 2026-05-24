@@ -1,5 +1,6 @@
 import { writeFile } from 'fs/promises'
 import env from '@/helpers/env'
+import { resolveMaxHeight } from '@/helpers/resolveMaxHeight'
 import { mergeApiBases } from '@/helpers/normalizeApiUrl'
 import { extractYoutubeVideoId } from '@/helpers/youtubeVideoId'
 import { ValidationError } from '@/lib/errors'
@@ -51,22 +52,29 @@ function streamSize(item: PipedStreamItem): number {
   return item.contentLength ?? 0
 }
 
-function fitsLimits(item: PipedStreamItem, audio: boolean): boolean {
+function fitsLimits(
+  item: PipedStreamItem,
+  audio: boolean,
+  maxHeight: number
+): boolean {
   const size = streamSize(item)
   if (size > 0 && size > env.MAX_FILE_SIZE_BYTES) {
     return false
   }
   if (!audio) {
     const height = parseHeightLabel(item.quality)
-    if (height > env.YOUTUBE_MAX_HEIGHT) {
+    if (height > maxHeight) {
       return false
     }
   }
   return true
 }
 
-function pickAudioStream(streams: PipedStreamItem[]): PipedStreamItem {
-  const candidates = streams.filter((s) => fitsLimits(s, true))
+function pickAudioStream(
+  streams: PipedStreamItem[],
+  maxHeight: number
+): PipedStreamItem {
+  const candidates = streams.filter((s) => fitsLimits(s, true, maxHeight))
   if (candidates.length === 0) {
     throw new Error('No suitable Piped audio stream under size limit')
   }
@@ -74,10 +82,15 @@ function pickAudioStream(streams: PipedStreamItem[]): PipedStreamItem {
   return candidates[0]
 }
 
-function pickVideoStream(streams: PipedStreamItem[]): PipedStreamItem {
-  let candidates = streams.filter((s) => !s.videoOnly && fitsLimits(s, false))
+function pickVideoStream(
+  streams: PipedStreamItem[],
+  maxHeight: number
+): PipedStreamItem {
+  let candidates = streams.filter(
+    (s) => !s.videoOnly && fitsLimits(s, false, maxHeight)
+  )
   if (candidates.length === 0) {
-    candidates = streams.filter((s) => fitsLimits(s, false))
+    candidates = streams.filter((s) => fitsLimits(s, false, maxHeight))
   }
   if (candidates.length === 0) {
     throw new Error('No suitable Piped video stream under size/height limit')
@@ -152,8 +165,10 @@ export async function downloadPipedYoutube(
   url: string,
   outputBase: string,
   audio: boolean,
-  timeoutMs: number
+  timeoutMs: number,
+  maxHeight?: number
 ): Promise<YtdlpDownloadResult> {
+  const heightLimit = resolveMaxHeight(maxHeight)
   const videoId = extractYoutubeVideoId(url)
   if (!videoId) {
     throw new Error('Invalid YouTube URL')
@@ -165,8 +180,8 @@ export async function downloadPipedYoutube(
   }
 
   const stream = audio
-    ? pickAudioStream(data.audioStreams ?? [])
-    : pickVideoStream(data.videoStreams ?? [])
+    ? pickAudioStream(data.audioStreams ?? [], heightLimit)
+    : pickVideoStream(data.videoStreams ?? [], heightLimit)
 
   const ext = audio ? '.m4a' : '.mp4'
   const destPath = `${outputBase}${ext}`

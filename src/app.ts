@@ -17,10 +17,18 @@ import handleAudio from '@/handlers/audio'
 import handleHelp from '@/handlers/help'
 import handleLanguage from '@/handlers/language'
 import handleUrl from '@/handlers/url'
+import handleStart from '@/handlers/start'
+import handlePhoto from '@/handlers/photo'
+import handleRefer from '@/handlers/refer'
+import { handleAdminStats } from '@/handlers/admin'
 import {
   handleRetryDownload,
   handleRetrySubscription,
 } from '@/handlers/callbacks'
+import {
+  handleFormatChoice,
+  handleShareBot,
+} from '@/handlers/formatCallback'
 import { collectHealthDiagnostics } from '@/helpers/healthDiagnostics'
 import i18n from '@/helpers/i18n'
 import languageMenu from '@/menus/language'
@@ -79,11 +87,22 @@ async function runApp() {
     .use(requiredSubscription)
     .use(languageMenu)
 
-  bot.command(['help', 'start'], handleHelp)
+  bot.command('start', handleStart)
+  bot.command(['help', 'download'], handleHelp)
   bot.command('language', handleLanguage)
   bot.command('audio', handleAudio)
+  bot.command('refer', handleRefer)
+  bot.command('stats', handleAdminStats)
+  bot.command('users', handleAdminStats)
   bot.callbackQuery('retry_sub', handleRetrySubscription)
   bot.callbackQuery('retry_download', handleRetryDownload)
+  bot.callbackQuery(/^fmt:/, handleFormatChoice)
+  bot.callbackQuery('action:share', handleShareBot)
+  bot.callbackQuery('noop:language', async (ctx) => {
+    await ctx.answerCallbackQuery()
+    return handleLanguage(ctx)
+  })
+  bot.on('message:photo', handlePhoto)
   bot.hears(
     /https?:\/\/[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&/=]*)/i,
     handleUrl

@@ -3,7 +3,10 @@ import { join } from 'path'
 import { DocumentType } from '@typegoose/typegoose'
 import { InputFile } from 'grammy'
 import { findOrCreateChat } from '@/models/Chat'
+import { DownloadMode } from '@/models/DownloadMode'
 import { findOrCreateUrl } from '@/models/Url'
+import { markLinkLogResult } from '@/helpers/logUserLink'
+import type { SendMediaOptions } from '@/helpers/sendMediaOptions'
 import DownloadJob from '@/models/DownloadJob'
 import DownloadJobStatus from '@/models/DownloadJobStatus'
 import env from '@/helpers/env'
@@ -81,30 +84,47 @@ const MEDIA_EXTENSIONS = [
   '.flac',
 ]
 
-function isMediaFile(name: string): boolean {
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.webp', '.png', '.gif']
+
+function isImageFile(name: string): boolean {
+  const lower = name.toLowerCase()
+  return IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext))
+}
+
+function isMediaFile(name: string, allowImages: boolean): boolean {
   if (name.endsWith('.part') || name.endsWith('.info.json')) {
     return false
   }
-  if (name.endsWith('.jpg') || name.endsWith('.webp') || name.endsWith('.png')) {
-    return false
+  if (isImageFile(name)) {
+    return allowImages
   }
   return MEDIA_EXTENSIONS.some((ext) => name.toLowerCase().endsWith(ext))
 }
 
 async function findMediaFile(
   jobDir: string,
-  fileBase: string
+  fileBase: string,
+  allowImages: boolean
 ): Promise<string | undefined> {
   const entries = await readdir(jobDir)
   const prefixed = entries.filter(
-    (name) => name.startsWith(`${fileBase}.`) && isMediaFile(name)
+    (name) =>
+      name.startsWith(`${fileBase}.`) && isMediaFile(name, allowImages)
   )
   if (prefixed.length === 1) {
     return join(jobDir, prefixed[0])
   }
-  const any = entries.filter(isMediaFile)
+  const any = entries.filter((n) => isMediaFile(n, allowImages))
   if (any.length === 1) {
     return join(jobDir, any[0])
+  }
+  if (allowImages) {
+    const thumb = entries.find(
+      (n) => n.includes('thumbnail') && isImageFile(n)
+    )
+    if (thumb) {
+      return join(jobDir, thumb)
+    }
   }
   return undefined
 }
@@ -121,7 +141,7 @@ async function resolveDownloadedPath(
   if (ext) {
     return join(jobDir, `${fileBase}.${ext}`)
   }
-  const found = await findMediaFile(jobDir, fileBase)
+  const found = await findMediaFile(jobDir, fileBase, false)
   if (found) {
     return found
   }
@@ -148,21 +168,37 @@ export default async function downloadUrl(
     const outputBase = join(jobDir, 'video')
     const jobId = String(downloadJob.id)
 
-    logger.info('download start', { url: downloadJob.url, jobId, jobDir })
-    const ytdlpResult = isYoutubeUrl(downloadJob.url)
-      ? await runYoutubeDownload(
-          downloadJob.url,
-          outputBase,
-          downloadJob.audio,
-          jobId,
-          env.DOWNLOAD_TIMEOUT_MS
-        )
-      : await runYtdlpDownload(
-          downloadJob.url,
-          buildDownloadFlags(outputBase, downloadJob.audio),
-          env.DOWNLOAD_TIMEOUT_MS,
-          'download'
-        )
+    const imageMode = downloadJob.downloadMode === DownloadMode.image
+    const maxHeight =
+      downloadJob.maxHeight > 0 ? downloadJob.maxHeight : env.YOUTUBE_MAX_HEIGHT
+    const flagOpts = {
+      maxHeight,
+      imageMode,
+    }
+
+    logger.info('download start', {
+      url: downloadJob.url,
+      jobId,
+      jobDir,
+      mode: downloadJob.downloadMode,
+      maxHeight,
+    })
+    const ytdlpResult =
+      isYoutubeUrl(downloadJob.url) && !imageMode
+        ? await runYoutubeDownload(
+            downloadJob.url,
+            outputBase,
+            downloadJob.audio,
+            jobId,
+            env.DOWNLOAD_TIMEOUT_MS,
+            { maxHeight }
+          )
+        : await runYtdlpDownload(
+            downloadJob.url,
+            buildDownloadFlags(outputBase, downloadJob.audio, flagOpts),
+            env.DOWNLOAD_TIMEOUT_MS,
+            'download'
+          )
 
     const entries = await readdir(jobDir)
     logger.info('download dir after yt-dlp', {
@@ -177,7 +213,7 @@ export default async function downloadUrl(
       validateMetadata(info, downloadJob.url)
       filePath = await resolveDownloadedPath(info, jobDir, 'video')
     } else {
-      const found = await findMediaFile(jobDir, 'video')
+      const found = await findMediaFile(jobDir, 'video', imageMode)
       if (!found) {
         const hint = ytdlpResult.stderr.slice(0, 300) || entries.join(', ') || 'empty'
         if (isYoutubeBotBlock(hint)) {
@@ -188,7 +224,13 @@ export default async function downloadUrl(
       filePath = found
     }
     const fileSize = await assertFileWithinLimits(filePath)
-    const escapedTitle = escapeTitle(info?.title)
+    const description =
+      typeof info?.description === 'string' ? info.description.trim() : ''
+    const escapedTitle = escapeTitle(
+      [info?.title, imageMode && description ? description : '']
+        .filter(Boolean)
+        .join('\n\n')
+    )
 
     downloadJob.status = DownloadJobStatus.uploading
     await saveDownloadJob(downloadJob, 'uploading')
@@ -196,8 +238,14 @@ export default async function downloadUrl(
     const { doc: originalChat } = await findOrCreateChat(
       downloadJob.originalChatId
     )
+    const media: SendMediaOptions = {
+      audio: downloadJob.audio,
+      downloadMode: downloadJob.downloadMode,
+    }
     const thumbPath =
-      downloadJob.audio || !shouldProcessThumbnail(fileSize)
+      downloadJob.audio ||
+      imageMode ||
+      !shouldProcessThumbnail(fileSize)
         ? undefined
         : info
           ? await getThumbnailUrl(info, jobDir, 'video', fileSize)
@@ -208,7 +256,7 @@ export default async function downloadUrl(
         downloadJob.originalChatId,
         downloadJob.originalMessageId,
         originalChat.language,
-        downloadJob.audio,
+        media,
         escapedTitle,
         filePath,
         thumbPath
@@ -218,13 +266,18 @@ export default async function downloadUrl(
     )
 
     await findOrCreateUrl(
-      downloadJob.url,
+      {
+        url: downloadJob.url,
+        audio: downloadJob.audio,
+        downloadMode: downloadJob.downloadMode,
+        maxHeight: downloadJob.maxHeight,
+      },
       fileId,
-      downloadJob.audio,
       escapedTitle || 'No title'
     )
     downloadJob.status = DownloadJobStatus.finished
     await saveDownloadJob(downloadJob, 'finished')
+    await markLinkLogResult(downloadJob.originalChatId, downloadJob.url, true)
     logger.info('download finished', { url: downloadJob.url, jobId: downloadJob.id })
   } catch (error) {
     metrics.increment('failedDownloads')
@@ -253,6 +306,12 @@ export default async function downloadUrl(
       downloadJob.status = DownloadJobStatus.failedUpload
     }
     await saveDownloadJob(downloadJob, 'failed')
+    await markLinkLogResult(
+      downloadJob.originalChatId,
+      downloadJob.url,
+      false,
+      downloadJob.status
+    )
     if (error instanceof Error && isYoutubeCookiesInvalid(error.message)) {
       logger.error(
         'YouTube cookies invalid on server — export fresh cookies.txt from Chrome',

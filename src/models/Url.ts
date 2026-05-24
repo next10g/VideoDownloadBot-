@@ -1,4 +1,5 @@
 import { getModelForClass, modelOptions, prop } from '@typegoose/typegoose'
+import { DownloadMode } from '@/models/DownloadMode'
 
 @modelOptions({ schemaOptions: { timestamps: true } })
 export class Url {
@@ -8,30 +9,54 @@ export class Url {
   fileId!: string
   @prop({ required: true, index: true, default: false })
   audio!: boolean
+  @prop({ enum: DownloadMode, default: DownloadMode.video, index: true })
+  downloadMode!: DownloadMode
+  @prop({ default: 0, index: true })
+  maxHeight!: number
   @prop({ required: true })
   title!: string
 }
 
 const UrlModel = getModelForClass(Url)
 
-export function findUrl(url: string, audio: boolean) {
-  return UrlModel.findOne({ url, audio })
+export interface UrlCacheKey {
+  url: string
+  audio: boolean
+  downloadMode?: DownloadMode
+  maxHeight?: number
+}
+
+export function findUrl(key: UrlCacheKey) {
+  return UrlModel.findOne({
+    url: key.url,
+    audio: key.audio,
+    downloadMode: key.downloadMode ?? DownloadMode.video,
+    maxHeight: key.maxHeight ?? 0,
+  })
 }
 
 export async function findOrCreateUrl(
-  url: string,
+  key: UrlCacheKey,
   fileId: string,
-  audio: boolean,
   title: string
 ) {
-  const dburl = await UrlModel.findOne({ url, audio })
+  const downloadMode = key.downloadMode ?? DownloadMode.video
+  const maxHeight = key.maxHeight ?? 0
+  const dburl = await UrlModel.findOne({
+    url: key.url,
+    audio: key.audio,
+    downloadMode,
+    maxHeight,
+  })
   if (dburl) {
     return dburl
   }
   return UrlModel.create({
-    url,
+    url: key.url,
     fileId,
-    audio,
+    audio: key.audio,
+    downloadMode,
+    maxHeight,
     title,
   })
 }

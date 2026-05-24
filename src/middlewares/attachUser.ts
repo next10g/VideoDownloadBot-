@@ -1,5 +1,6 @@
 import { NextFunction } from 'grammy'
 import { findOrCreateChat } from '@/models/Chat'
+import { syncChatProfile } from '@/helpers/syncChatProfile'
 import Context from '@/models/Context'
 
 export default async function attachChat(ctx: Context, next: NextFunction) {
@@ -8,5 +9,6 @@ export default async function attachChat(ctx: Context, next: NextFunction) {
   }
   const { doc: chat } = await findOrCreateChat(ctx.chat.id)
   ctx.dbchat = chat
+  await syncChatProfile(ctx)
   return next()
 }

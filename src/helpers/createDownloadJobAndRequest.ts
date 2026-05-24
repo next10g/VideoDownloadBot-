@@ -1,5 +1,9 @@
 import env from '@/helpers/env'
-import { findOrCreateDownloadJob } from '@/models/downloadJobFunctions'
+import {
+  findOrCreateDownloadJob,
+  type DownloadJobOptions,
+} from '@/models/downloadJobFunctions'
+import { DownloadMode } from '@/models/DownloadMode'
 import { findOrCreateDownloadRequest } from '@/models/downloadRequestFunctions'
 import Context from '@/models/Context'
 import DownloadJobStatus from '@/models/DownloadJobStatus'
@@ -32,12 +36,22 @@ import {
 } from '@/helpers/youtubeCooldown'
 import { recordDownloadFailure } from '@/helpers/userAbuse'
 
+export interface DownloadRequestOptions extends DownloadJobOptions {
+  downloadMode: DownloadMode
+  maxHeight: number
+}
+
 export default async function createDownloadJobAndRequest(
   ctx: Context,
-  rawUrl: string
+  rawUrl: string,
+  requestOpts: DownloadRequestOptions
 ) {
   const url = normalizeUrl(rawUrl)
+  const audio =
+    requestOpts.audio || requestOpts.downloadMode === DownloadMode.audio
   ctx.dbchat.lastUrl = url
+  ctx.dbchat.pendingUrl = undefined
+  ctx.dbchat.pendingTitle = undefined
   await ctx.dbchat.save()
 
   if (isOnCooldown(ctx.dbchat.telegramId)) {
@@ -64,7 +78,7 @@ export default async function createDownloadJobAndRequest(
 
   try {
     const checkedUrl = await preflightUrl(url)
-    await assertUserJobLimits(ctx.dbchat.telegramId, checkedUrl, ctx.dbchat.audio)
+    await assertUserJobLimits(ctx.dbchat.telegramId, checkedUrl, audio)
     if (!env.SKIP_YTDLP_PROBE) {
       try {
         await probeUrlMetadata(checkedUrl)
@@ -83,7 +97,12 @@ export default async function createDownloadJobAndRequest(
 
     try {
       const cached = await checkForCachedUrlAndSendFile(
-        checkedUrl,
+        {
+          url: checkedUrl,
+          audio,
+          downloadMode: requestOpts.downloadMode,
+          maxHeight: requestOpts.maxHeight,
+        },
         ctx,
         downloadMessageEditor
       )
@@ -112,13 +131,21 @@ export default async function createDownloadJobAndRequest(
       await downloadMessageEditor.editMessage(ctx.i18n.t('status_queued'))
     }
 
-    await ctx.replyWithChatAction(
-      ctx.dbchat.audio ? 'upload_voice' : 'upload_video'
-    )
+    const uploadAction =
+      requestOpts.downloadMode === DownloadMode.audio
+        ? 'upload_voice'
+        : requestOpts.downloadMode === DownloadMode.image
+          ? 'upload_photo'
+          : 'upload_video'
+    await ctx.replyWithChatAction(uploadAction)
 
     const { doc: downloadJob, created } = await findOrCreateDownloadJob(
       checkedUrl,
-      ctx.dbchat.audio,
+      {
+        audio,
+        downloadMode: requestOpts.downloadMode,
+        maxHeight: requestOpts.maxHeight,
+      },
       ctx.dbchat.telegramId,
       statusMsg.message_id
     )

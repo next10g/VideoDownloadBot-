@@ -1,19 +1,38 @@
+import { DownloadMode } from '@/models/DownloadMode'
 import { DownloadJobModel } from '@/models'
+
+export interface DownloadJobOptions {
+  audio: boolean
+  downloadMode?: DownloadMode
+  maxHeight?: number
+}
 
 export function findOrCreateDownloadJob(
   url: string,
-  audio: boolean,
+  options: DownloadJobOptions,
   originalChatId: number,
   originalMessageId: number
 ) {
+  const downloadMode = options.downloadMode ?? DownloadMode.video
+  const maxHeight = options.maxHeight ?? 0
+  const audio =
+    options.audio || downloadMode === DownloadMode.audio
+
   return DownloadJobModel.findOrCreate(
-    { url, audio },
-    { originalChatId, originalMessageId }
+    { url, audio, downloadMode, maxHeight },
+    { originalChatId, originalMessageId, downloadMode, maxHeight }
   )
 }
 
-export function deleteDownloadJob(url: string, audio: boolean) {
-  return DownloadJobModel.deleteMany({ url, audio })
+export function deleteDownloadJob(
+  url: string,
+  options: DownloadJobOptions
+) {
+  const downloadMode = options.downloadMode ?? DownloadMode.video
+  const maxHeight = options.maxHeight ?? 0
+  const audio =
+    options.audio || downloadMode === DownloadMode.audio
+  return DownloadJobModel.deleteMany({ url, audio, downloadMode, maxHeight })
 }
 
 export function findAllDownloadJobs() {

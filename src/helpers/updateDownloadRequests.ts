@@ -2,6 +2,8 @@ import { Chat, findOrCreateChat } from '@/models/Chat'
 import { DocumentType } from '@typegoose/typegoose'
 import { findDownloadRequestsForDownloadJob } from '@/models/downloadRequestFunctions'
 import { findUrl } from '@/models/Url'
+import { DownloadMode } from '@/models/DownloadMode'
+import type { SendMediaOptions } from '@/helpers/sendMediaOptions'
 import DownloadJob from '@/models/DownloadJob'
 import DownloadJobStatus from '@/models/DownloadJobStatus'
 import DownloadRequest from '@/models/DownloadRequest'
@@ -73,18 +75,27 @@ async function sendFileToNonOriginalRequests(
   if (!otherRequests.length) {
     return
   }
-  const cachedUrl = await findUrl(downloadJob.url, downloadJob.audio)
+  const cachedUrl = await findUrl({
+    url: downloadJob.url,
+    audio: downloadJob.audio,
+    downloadMode: downloadJob.downloadMode ?? DownloadMode.video,
+    maxHeight: downloadJob.maxHeight ?? 0,
+  })
   if (!cachedUrl) {
     throw new Error('Cached url not found')
   }
   for (const request of otherRequests) {
     const chat = chats[request.chatId]
     try {
+      const media: SendMediaOptions = {
+        audio: downloadJob.audio,
+        downloadMode: downloadJob.downloadMode ?? DownloadMode.video,
+      }
       await sendCompletedFile(
         request.chatId,
         request.messageId,
         chat.language,
-        downloadJob.audio,
+        media,
         cachedUrl.title,
         cachedUrl.fileId
       )

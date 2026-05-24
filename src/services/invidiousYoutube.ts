@@ -1,5 +1,6 @@
 import { writeFile } from 'fs/promises'
 import env from '@/helpers/env'
+import { resolveMaxHeight } from '@/helpers/resolveMaxHeight'
 import { mergeApiBases } from '@/helpers/normalizeApiUrl'
 import { extractYoutubeVideoId } from '@/helpers/youtubeVideoId'
 import { ValidationError } from '@/lib/errors'
@@ -70,13 +71,14 @@ function pickInvidiousAudio(formats: InvidiousFormat[]): InvidiousFormat {
 
 function pickInvidiousVideo(
   formatStreams: InvidiousFormat[],
-  adaptiveFormats: InvidiousFormat[]
+  adaptiveFormats: InvidiousFormat[],
+  maxHeight: number
 ): InvidiousFormat {
   let candidates = formatStreams.filter((f) => {
     const height = parseHeightLabel(f.quality || f.qualityLabel || '')
     return (
       fitsSize(parseByteSize(f.size)) &&
-      height <= env.YOUTUBE_MAX_HEIGHT &&
+      height <= maxHeight &&
       /mp4|mpeg/i.test(f.container || f.type || '')
     )
   })
@@ -89,7 +91,7 @@ function pickInvidiousVideo(
       const height = parseHeightLabel(
         f.qualityLabel || f.resolution || f.quality || ''
       )
-      return fitsSize(parseByteSize(f.size)) && height <= env.YOUTUBE_MAX_HEIGHT
+      return fitsSize(parseByteSize(f.size)) && height <= maxHeight
     })
   }
   if (candidates.length === 0) {
@@ -161,8 +163,10 @@ export async function downloadInvidiousYoutube(
   url: string,
   outputBase: string,
   audio: boolean,
-  timeoutMs: number
+  timeoutMs: number,
+  maxHeight?: number
 ): Promise<YtdlpDownloadResult> {
+  const heightLimit = resolveMaxHeight(maxHeight)
   const videoId = extractYoutubeVideoId(url)
   if (!videoId) {
     throw new Error('Invalid YouTube URL')
@@ -177,7 +181,8 @@ export async function downloadInvidiousYoutube(
     ? pickInvidiousAudio(data.adaptiveFormats ?? [])
     : pickInvidiousVideo(
         data.formatStreams ?? [],
-        data.adaptiveFormats ?? []
+        data.adaptiveFormats ?? [],
+        heightLimit
       )
 
   const ext = audio ? '.m4a' : '.mp4'

@@ -7,6 +7,7 @@ import MessageEditor from '@/helpers/MessageEditor'
 import { buildRetryKeyboard } from '@/helpers/progressKeyboard'
 import i18n from '@/helpers/i18n'
 import sendCompletedFile from '@/helpers/sendCompletedFile'
+import type { SendMediaOptions } from '@/helpers/sendMediaOptions'
 
 export async function findOrCreateDownloadRequest(
   chatId: number,
@@ -60,16 +61,25 @@ export async function findOrCreateDownloadRequest(
       )
       break
     case DownloadJobStatus.finished: {
-      const url = await findUrl(downloadJob.url, downloadJob.audio)
+      const url = await findUrl({
+        url: downloadJob.url,
+        audio: downloadJob.audio,
+        downloadMode: downloadJob.downloadMode,
+        maxHeight: downloadJob.maxHeight,
+      })
       if (!url) {
         throw new Error('Cached url not found')
       }
       await editor.editMessage(i18n.t(doc.language, 'status_completed'))
+      const media: SendMediaOptions = {
+        audio: url.audio,
+        downloadMode: url.downloadMode,
+      }
       await sendCompletedFile(
         chatId,
         messageId,
         doc.language,
-        url.audio,
+        media,
         url.title,
         url.fileId
       )

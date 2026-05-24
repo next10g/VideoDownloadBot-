@@ -1,14 +1,37 @@
 # Language name
 name: English
 # Commands
+welcome: |
+  👋 Welcome to <b>Easy Way</b> — video downloader bot!
+
+  Send a <b>link</b>, then pick video quality, audio, or image.
+
+  /download — how to use
+  /refer — invite friends
 help: |
   😎 Send me a video link and I'll download it to this chat!
 
-  /help — this message
+  /start — main menu
   /language — change language
-  /audio — download as audio only
+  /audio — default audio-only mode
+  /refer — your invite link
+
+  After the link, choose quality / audio / image.
 
   Developer: <b>Nour Mohamed</b> — @Dev_Nour_M
+format_choose: "✅ Link OK. Choose download type:"
+format_choose_with_title: "✅ <b>${title}</b>\n\nChoose download type:"
+btn_format_video: "🎬 Video ${height}p"
+btn_format_audio: "🎵 Audio only"
+btn_format_image: "🖼 Image + caption"
+btn_share_bot: "📤 Share bot"
+btn_invite_friend: "🎁 Invite friend"
+btn_language_menu: "🌐 Language"
+refer_info: "🎁 Invite link:\n${link}\n\nReferrals: <b>${count}</b>"
+refer_share: "📤 Share:\n${link}"
+refer_share_text: "Download videos from YouTube, TikTok, Facebook — free!"
+refer_disabled: Referral program is disabled.
+photo_default_title: Image
 language: 😶 Please select a language.
 language_selected: 😎 English selected.
 audio_on: 📣 I'll convert downloads to audio only.

@@ -130,14 +130,22 @@ export async function runYoutubeDownload(
   outputBase: string,
   audio: boolean,
   jobId: string,
-  timeoutMs: number
+  timeoutMs: number,
+  options?: { maxHeight?: number }
 ): Promise<YtdlpDownloadResult> {
   const failures: string[] = []
+  const maxHeight = options?.maxHeight
 
   if (useProxyYoutubeApis()) {
     try {
       logger.info('youtube invidious download', { jobId })
-      return await downloadInvidiousYoutube(url, outputBase, audio, timeoutMs)
+      return await downloadInvidiousYoutube(
+        url,
+        outputBase,
+        audio,
+        timeoutMs,
+        maxHeight
+      )
     } catch (error) {
       const detail = fetchErrorDetail(error)
       failures.push(`invidious: ${detail}`)
@@ -146,7 +154,13 @@ export async function runYoutubeDownload(
 
     try {
       logger.info('youtube piped download', { jobId })
-      return await downloadPipedYoutube(url, outputBase, audio, timeoutMs)
+      return await downloadPipedYoutube(
+        url,
+        outputBase,
+        audio,
+        timeoutMs,
+        maxHeight
+      )
     } catch (error) {
       const detail = fetchErrorDetail(error)
       failures.push(`piped: ${detail}`)

@@ -1,5 +1,6 @@
 import Context from '@/models/Context'
 import createDownloadJobAndRequest from '@/helpers/createDownloadJobAndRequest'
+import { DownloadMode } from '@/models/DownloadMode'
 import { isUserSubscribed } from '@/middlewares/requiredSubscription'
 import {
   blockRemainingMinutes,
@@ -17,7 +18,11 @@ export async function handleRetrySubscription(ctx: Context) {
   if (subscribed) {
     await ctx.reply(ctx.i18n.t('subscription_confirmed'))
     if (ctx.dbchat.lastUrl) {
-      return createDownloadJobAndRequest(ctx, ctx.dbchat.lastUrl)
+      return createDownloadJobAndRequest(ctx, ctx.dbchat.lastUrl, {
+        downloadMode: ctx.dbchat.audio ? DownloadMode.audio : DownloadMode.video,
+        maxHeight: 720,
+        audio: ctx.dbchat.audio,
+      })
     }
     return
   }
@@ -49,7 +54,11 @@ export async function handleRetryDownload(ctx: Context) {
     return ctx.reply(ctx.i18n.t('subscription_required_short'))
   }
   try {
-    return createDownloadJobAndRequest(ctx, ctx.dbchat.lastUrl)
+    return createDownloadJobAndRequest(ctx, ctx.dbchat.lastUrl, {
+      downloadMode: ctx.dbchat.audio ? DownloadMode.audio : DownloadMode.video,
+      maxHeight: 720,
+      audio: ctx.dbchat.audio,
+    })
   } catch (error) {
     report(error, { ctx, location: 'handleRetryDownload' })
     return ctx.reply(ctx.i18n.t('error_cannot_start_download'))

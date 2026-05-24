@@ -1,4 +1,5 @@
-import { findUrl } from '@/models/Url'
+import { findUrl, type UrlCacheKey } from '@/models/Url'
+import { DownloadMode } from '@/models/DownloadMode'
 import Context from '@/models/Context'
 import MessageEditor from '@/helpers/MessageEditor'
 import sendCompletedFile from '@/helpers/sendCompletedFile'
@@ -7,28 +8,32 @@ import { metrics } from '@/lib/metrics'
 import { recordDownloadSuccess } from '@/helpers/userAbuse'
 
 export default async function checkForCachedUrlAndSendFile(
-  url: string,
+  key: UrlCacheKey,
   ctx: Context,
   editor: MessageEditor
 ): Promise<boolean> {
-  const cachedUrl = await findUrl(url, ctx.dbchat.audio)
+  const cachedUrl = await findUrl(key)
   if (!cachedUrl) {
     return false
   }
 
   metrics.increment('cacheHits')
-  logger.info('cache hit', { url, chatId: ctx.dbchat.telegramId })
+  logger.info('cache hit', { url: key.url, chatId: ctx.dbchat.telegramId })
 
   await editor.editMessage(ctx.i18n.t('status_sending_cached'))
   if (!ctx.msg) {
     return false
   }
 
+  const mode = key.downloadMode ?? DownloadMode.video
   await sendCompletedFile(
     ctx.dbchat.telegramId,
     ctx.msg.message_id,
     ctx.dbchat.language,
-    ctx.dbchat.audio,
+    {
+      audio: key.audio,
+      downloadMode: mode,
+    },
     cachedUrl.title,
     cachedUrl.fileId
   )

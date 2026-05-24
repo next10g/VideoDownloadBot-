@@ -7,6 +7,7 @@ import {
   post,
   prop,
 } from '@typegoose/typegoose'
+import { DownloadMode } from '@/models/DownloadMode'
 import DownloadJobStatus from '@/models/DownloadJobStatus'
 import downloadQueue from '@/helpers/downloadQueue'
 import report from '@/helpers/report'
@@ -33,6 +34,13 @@ export default class DownloadJob extends FindOrCreate {
   url!: string
   @prop({ required: true, index: true, default: false })
   audio!: boolean
+
+  @prop({ enum: DownloadMode, default: DownloadMode.video, index: true })
+  downloadMode!: DownloadMode
+
+  /** Video max height (360/480/720/1080). 0 = server default. */
+  @prop({ default: 0, index: true })
+  maxHeight!: number
   @prop({
     required: true,
     index: true,
