@@ -1,6 +1,11 @@
 import { InputFile } from 'grammy'
+import type { Message } from '@grammyjs/types'
 import bot from '@/helpers/bot'
 import logger from '@/lib/logger'
+
+function isPhotoMessage(msg: Message): msg is Message.PhotoMessage {
+  return msg.photo !== undefined
+}
 
 const TELEGRAM_ALBUM_MAX = 10
 
@@ -25,7 +30,7 @@ export async function sendPhotoAlbum(
       reply_to_message_id: replyToMessageId,
     })
     for (const msg of sent) {
-      if (msg.photo?.length) {
+      if (isPhotoMessage(msg) && msg.photo.length) {
         fileIds.push(msg.photo[msg.photo.length - 1].file_id)
       }
     }
