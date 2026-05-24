@@ -38,6 +38,10 @@ import {
 } from '@/helpers/youtubeCooldown'
 import { recordDownloadFailure } from '@/helpers/userAbuse'
 import { saveDbChat } from '@/helpers/saveDbChat'
+import {
+  chatActionForDownload,
+  statusDownloadingKey,
+} from '@/helpers/downloadStatusI18n'
 
 export interface DownloadRequestOptions extends DownloadJobOptions {
   downloadMode: DownloadMode
@@ -147,13 +151,9 @@ export default async function createDownloadJobAndRequest(
       await downloadMessageEditor.editMessage(ctx.i18n.t('status_queued'))
     }
 
-    const uploadAction =
-      requestOpts.downloadMode === DownloadMode.audio
-        ? 'upload_voice'
-        : requestOpts.downloadMode === DownloadMode.image
-          ? 'upload_photo'
-          : 'upload_video'
-    await ctx.replyWithChatAction(uploadAction)
+    await ctx.replyWithChatAction(
+      chatActionForDownload(requestOpts.downloadMode, audio)
+    )
 
     const { doc: downloadJob, created } = await findOrCreateDownloadJob(
       checkedUrl,
@@ -174,12 +174,15 @@ export default async function createDownloadJobAndRequest(
       downloadJob
     )
 
+    const downloadingText = ctx.i18n.t(
+      statusDownloadingKey(requestOpts.downloadMode, audio)
+    )
     if (created) {
-      await downloadMessageEditor.editMessage(ctx.i18n.t('status_downloading'))
+      await downloadMessageEditor.editMessage(downloadingText)
       downloadJob.status = DownloadJobStatus.downloading
       await downloadJob.save()
     } else if (downloadJob.status === DownloadJobStatus.downloading) {
-      await downloadMessageEditor.editMessage(ctx.i18n.t('status_downloading'))
+      await downloadMessageEditor.editMessage(downloadingText)
     } else {
       await downloadMessageEditor.editMessage(ctx.i18n.t('status_queued'))
     }

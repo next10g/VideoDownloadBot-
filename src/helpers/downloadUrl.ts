@@ -54,6 +54,7 @@ import {
   downloadInstagramPostImages,
   shouldUseInstagramDownloaders,
 } from '@/helpers/instagramImageDownload'
+import { downloadMetaCarousel } from '@/services/metaCarouselDownload'
 import { sendPhotoAlbum } from '@/helpers/sendPhotoAlbum'
 import { collectImageUrlsFromInfo } from '@/helpers/extractImageUrlsFromInfo'
 import { prepareTelegramPhoto } from '@/helpers/prepareTelegramPhoto'
@@ -295,7 +296,30 @@ export default async function downloadUrl(
 
     const isSocial = isSocialCarouselUrl(downloadJob.url)
 
-    if (albumMode && downloadJob.albumUrls?.length) {
+    if (
+      isSocial &&
+      wantImages &&
+      (albumMode || imageMode) &&
+      !isInstagramReelUrl(downloadJob.url)
+    ) {
+      try {
+        const paths = await downloadMetaCarousel(downloadJob.url, jobDir)
+        if (paths.length > 1) {
+          photoPaths = paths
+          info = { title: 'Album' } as YtDlpMetadata
+        } else if (paths.length === 1) {
+          filePath = paths[0]
+          info = { title: 'Photo', ext: 'jpg' } as YtDlpMetadata
+        }
+      } catch (error) {
+        logger.warn('meta carousel primary path failed', {
+          url: downloadJob.url,
+          detail: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+
+    if (albumMode && downloadJob.albumUrls?.length && !filePath && !photoPaths?.length) {
       if (shouldUseInstagramDownloaders(downloadJob.url)) {
         const rawPaths = await downloadInstagramPostImages(
           downloadJob.url,

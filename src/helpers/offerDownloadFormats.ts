@@ -28,6 +28,7 @@ import {
 } from '@/helpers/youtubeCooldown'
 import { isFacebookUrl } from '@/helpers/facebookUrl'
 import { isInstagramUrl } from '@/helpers/instagramUrl'
+import { probeMetaCarouselUrls } from '@/services/metaCarouselDownload'
 import { isYoutubeUrl } from '@/helpers/youtubeUrl'
 import { isGenericFileUrl } from '@/helpers/isGenericFileUrl'
 import { saveDbChat } from '@/helpers/saveDbChat'
@@ -90,6 +91,19 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
     }
 
     const isReel = /\/reel\//i.test(checkedUrl)
+
+    if (
+      (isInstagramUrl(checkedUrl) || isFacebookUrl(checkedUrl)) &&
+      !isReel &&
+      offer.albumUrls.length <= 1
+    ) {
+      const metaUrls = await probeMetaCarouselUrls(jobUrl)
+      if (metaUrls.length > offer.albumUrls.length) {
+        offer.albumUrls = metaUrls
+        offer.hasAlbum = metaUrls.length > 1
+      }
+    }
+
     const wantCarousel =
       !isReel &&
       offer.videoHeights.length === 0 &&

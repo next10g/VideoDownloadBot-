@@ -12,6 +12,11 @@ export default async function checkForCachedUrlAndSendFile(
   ctx: Context,
   editor: MessageEditor
 ): Promise<boolean> {
+  const mode = key.downloadMode ?? DownloadMode.video
+  if (mode === DownloadMode.album) {
+    return false
+  }
+
   const cachedUrl = await findUrl(key)
   if (!cachedUrl) {
     return false
@@ -25,7 +30,6 @@ export default async function checkForCachedUrlAndSendFile(
     return false
   }
 
-  const mode = key.downloadMode ?? DownloadMode.video
   await sendCompletedFile(
     ctx.dbchat.telegramId,
     ctx.msg.message_id,

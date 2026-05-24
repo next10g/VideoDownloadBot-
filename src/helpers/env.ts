@@ -61,6 +61,10 @@ const env = cleanEnv(process.env, {
   REQUIRED_CHANNEL: str({ default: '' }),
   REQUIRED_CHANNEL_LINK: str({ default: '' }),
   YTDLP_PATH: str({ default: '' }),
+  GALLERY_DL_PATH: str({
+    default: '',
+    desc: 'Optional gallery-dl binary for IG/FB carousels (fallback after embed scrape)',
+  }),
   FFMPEG_PATH: str({ default: '' }),
   YOUTUBE_BACKEND: str({
     choices: ['piped', 'ytdlp', 'auto'],
@@ -149,6 +153,10 @@ const envApi = {
   },
   get YTDLP_PATH_RESOLVED() {
     const custom = env.YTDLP_PATH.trim()
+    return custom || undefined
+  },
+  get GALLERY_DL_PATH_RESOLVED() {
+    const custom = env.GALLERY_DL_PATH.trim()
     return custom || undefined
   },
   get FFMPEG_PATH_RESOLVED() {

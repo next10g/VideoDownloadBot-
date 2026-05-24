@@ -1,6 +1,5 @@
 import { filterSocialImageUrls } from '@/helpers/filterSocialImageUrls'
-import { scrapeCarouselFromPostPage } from '@/helpers/instagramCarouselExtract'
-import { scrapeAllInstagramImages } from '@/helpers/instagramScrape'
+import { probeMetaCarouselUrls } from '@/services/metaCarouselDownload'
 import { isFacebookUrl } from '@/helpers/facebookUrl'
 import { isInstagramUrl, isInstagramReelUrl } from '@/helpers/instagramUrl'
 import logger from '@/lib/logger'
@@ -36,11 +35,11 @@ function probeTimeoutMs(url: string): number {
   return env.YTDLP_PROBE_TIMEOUT_MS
 }
 
-/** @deprecated Use scrapeAllInstagramImages */
+/** @deprecated Use probeMetaCarouselUrls */
 export async function scrapeInstagramEmbedImages(
   postUrl: string
 ): Promise<string[]> {
-  return scrapeAllInstagramImages(postUrl)
+  return probeMetaCarouselUrls(postUrl)
 }
 
 async function probeWithYtdlp(url: string, timeout: number): Promise<string[]> {
@@ -57,7 +56,7 @@ export async function probeSocialImageUrls(url: string): Promise<string[]> {
   const timeout = probeTimeoutMs(url)
 
   if (isInstagramUrl(url) && !isInstagramReelUrl(url)) {
-    const scraped = await scrapeAllInstagramImages(url)
+    const scraped = await probeMetaCarouselUrls(url)
     if (scraped.length > 0) {
       return scraped
     }
@@ -79,7 +78,7 @@ export async function probeSocialImageUrls(url: string): Promise<string[]> {
   }
 
   if (isInstagramUrl(url) && !isInstagramReelUrl(url)) {
-    return scrapeAllInstagramImages(url)
+    return probeMetaCarouselUrls(url)
   }
 
   return []
@@ -87,9 +86,9 @@ export async function probeSocialImageUrls(url: string): Promise<string[]> {
 
 /** Scrape + yt-dlp metadata — best effort carousel URL list for probe/menu. */
 export async function probeInstagramImageUrls(url: string): Promise<string[]> {
-  const pageCarousel = await scrapeCarouselFromPostPage(url)
-  if (pageCarousel.length > 1) {
-    return pageCarousel
+  const meta = await probeMetaCarouselUrls(url)
+  if (meta.length > 0) {
+    return meta
   }
 
   let urls = await probeSocialImageUrls(url)

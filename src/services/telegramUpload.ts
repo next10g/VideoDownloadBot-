@@ -9,6 +9,7 @@ import {
   isImageMode,
   type SendMediaOptions,
 } from '@/helpers/sendMediaOptions'
+import { DownloadMode } from '@/models/DownloadMode'
 import { isInstagramUrl } from '@/helpers/instagramUrl'
 import i18n from '@/helpers/i18n'
 import logger from '@/lib/logger'
@@ -223,10 +224,18 @@ function buildCaptionConfig(
     media.plainCaption ||
     (sourceUrl ? isInstagramUrl(sourceUrl) : false)
 
+  const captionKey = isImageMode(media)
+    ? 'photo_caption'
+    : media.audio
+      ? 'audio_caption'
+      : media.downloadMode === DownloadMode.file
+        ? 'file_caption'
+        : 'video_caption'
+
   return {
     caption: plain
       ? captionBody || title
-      : i18n.t(language, 'video_caption', {
+      : i18n.t(language, captionKey, {
           bot: bot.botInfo.username,
           title: captionBody || title,
         }),

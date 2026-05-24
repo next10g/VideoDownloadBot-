@@ -29,8 +29,18 @@ const CAROUSEL_MARKERS = [
   'sidecar_child',
 ]
 
-/** Carousel slides from sidecar / carousel blocks in embed HTML. */
+function htmlHasSidecar(html: string): boolean {
+  return CAROUSEL_MARKERS.some((marker) => html.includes(marker))
+}
+
+/** Carousel slides — full-page URLs when sidecar (embed puts slides before marker). */
 function extractSidecarDisplayUrls(html: string): string[] {
+  if (htmlHasSidecar(html)) {
+    const all = dedupeByAssetId(extractDisplayUrls(html))
+    if (all.length > 1) {
+      return all
+    }
+  }
   for (const marker of CAROUSEL_MARKERS) {
     const idx = html.indexOf(marker)
     if (idx >= 0) {
@@ -163,7 +173,8 @@ export async function scrapeAllInstagramImages(postUrl: string): Promise<string[
     }
   }
 
-  if (raw.length === 0) {
+  const sidecarHtml = embedHtml || ''
+  if (raw.length === 0 && !htmlHasSidecar(sidecarHtml)) {
     raw = await scrapeOembed(postUrl)
   }
 
