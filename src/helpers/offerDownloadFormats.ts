@@ -107,6 +107,14 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
     }
 
     if (preference === 'carousel') {
+      if (offer.albumUrls.length === 1) {
+        return createDownloadJobAndRequest(ctx, jobUrl, {
+          downloadMode: DownloadMode.image,
+          maxHeight: 0,
+          audio: false,
+          albumUrls: offer.albumUrls,
+        })
+      }
       await editor.editMessage(ctx.i18n.t('error_no_carousel'))
       return
     }

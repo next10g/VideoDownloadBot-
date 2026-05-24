@@ -43,12 +43,16 @@ import { recordUserDownload } from '@/helpers/userDownloadStats'
 import { saveUserLink } from '@/helpers/userLibrary'
 import { resolveDownloadedMediaPath } from '@/helpers/resolveDownloadedFile'
 import { ytdlpErrorI18nKey } from '@/helpers/ytdlpUserMessage'
-import { fetchImageToFile } from '@/helpers/fetchImageToFile'
 import {
   isSocialCarouselUrl,
   probeSocialImageUrls,
 } from '@/helpers/socialCarousel'
 import { downloadImagesToDir } from '@/helpers/downloadSocialImages'
+import { fetchImageToFile } from '@/helpers/fetchImageToFile'
+import {
+  downloadInstagramCdnImage,
+  shouldUseInstagramDownloaders,
+} from '@/helpers/instagramImageDownload'
 import { sendPhotoAlbum } from '@/helpers/sendPhotoAlbum'
 import { collectImageUrlsFromInfo } from '@/helpers/extractImageUrlsFromInfo'
 import { prepareTelegramPhoto } from '@/helpers/prepareTelegramPhoto'
@@ -135,11 +139,16 @@ async function resolveFromInfoJsonOnly(
   }
   const urls = await collectImageUrlsFromInfo(info, pageUrl)
   if (urls.length > 1) {
-    return { kind: 'album', paths: await downloadImagesToDir(urls, jobDir) }
+    return {
+      kind: 'album',
+      paths: await downloadImagesToDir(urls, jobDir, pageUrl),
+    }
   }
   if (urls.length === 1) {
     const dest = join(jobDir, 'video.jpg')
-    const downloaded = await fetchImageToFile(urls[0], dest)
+    const downloaded = shouldUseInstagramDownloaders(pageUrl)
+      ? await downloadInstagramCdnImage(urls[0], pageUrl, dest, jobDir, 'video')
+      : await fetchImageToFile(urls[0], dest)
     return {
       kind: 'single',
       path: await prepareTelegramPhoto(downloaded, jobDir),
@@ -167,11 +176,16 @@ async function deliverSocialImages(
   }
   const urls = await probeSocialImageUrls(pageUrl)
   if (urls.length > 1) {
-    return { kind: 'album', paths: await downloadImagesToDir(urls, jobDir) }
+    return {
+      kind: 'album',
+      paths: await downloadImagesToDir(urls, jobDir, pageUrl),
+    }
   }
   if (urls.length === 1) {
     const dest = join(jobDir, 'video.jpg')
-    const downloaded = await fetchImageToFile(urls[0], dest)
+    const downloaded = shouldUseInstagramDownloaders(pageUrl)
+      ? await downloadInstagramCdnImage(urls[0], pageUrl, dest, jobDir, 'video')
+      : await fetchImageToFile(urls[0], dest)
     return {
       kind: 'single',
       path: await prepareTelegramPhoto(downloaded, jobDir),
@@ -281,8 +295,27 @@ export default async function downloadUrl(
     const isSocial = isSocialCarouselUrl(downloadJob.url)
 
     if (albumMode && downloadJob.albumUrls?.length) {
-      photoPaths = await downloadImagesToDir(downloadJob.albumUrls, jobDir)
-      info = { title: 'Album' } as YtDlpMetadata
+      if (downloadJob.albumUrls.length === 1) {
+        const dest = join(jobDir, 'video.jpg')
+        const downloaded = shouldUseInstagramDownloaders(downloadJob.url)
+          ? await downloadInstagramCdnImage(
+              downloadJob.albumUrls[0],
+              downloadJob.url,
+              dest,
+              jobDir,
+              'video'
+            )
+          : await fetchImageToFile(downloadJob.albumUrls![0], dest)
+        filePath = await prepareTelegramPhoto(downloaded, jobDir)
+        info = { title: 'Photo', ext: 'jpg' } as YtDlpMetadata
+      } else {
+        photoPaths = await downloadImagesToDir(
+          downloadJob.albumUrls,
+          jobDir,
+          downloadJob.url
+        )
+        info = { title: 'Album' } as YtDlpMetadata
+      }
     }
 
     if (!filePath && !photoPaths?.length && isSocial && wantImages) {
@@ -291,11 +324,23 @@ export default async function downloadUrl(
           ? downloadJob.albumUrls!
           : await probeSocialImageUrls(downloadJob.url)
       if (imageUrls.length > 1) {
-        photoPaths = await downloadImagesToDir(imageUrls, jobDir)
+        photoPaths = await downloadImagesToDir(
+          imageUrls,
+          jobDir,
+          downloadJob.url
+        )
         info = { title: 'Album' } as YtDlpMetadata
       } else if (imageUrls.length === 1) {
         const dest = join(jobDir, 'video.jpg')
-        const downloaded = await fetchImageToFile(imageUrls[0], dest)
+        const downloaded = shouldUseInstagramDownloaders(downloadJob.url)
+          ? await downloadInstagramCdnImage(
+              imageUrls[0],
+              downloadJob.url,
+              dest,
+              jobDir,
+              'video'
+            )
+          : await fetchImageToFile(imageUrls[0], dest)
         filePath = await prepareTelegramPhoto(downloaded, jobDir)
         info = { title: 'Photo', ext: 'jpg' } as YtDlpMetadata
       }
@@ -445,10 +490,22 @@ export default async function downloadUrl(
           if (isSocial && wantImages) {
             const urls = await probeSocialImageUrls(downloadJob.url)
             if (urls.length > 1) {
-              photoPaths = await downloadImagesToDir(urls, jobDir)
+              photoPaths = await downloadImagesToDir(
+                urls,
+                jobDir,
+                downloadJob.url
+              )
             } else if (urls.length === 1) {
               const dest = join(jobDir, 'video.jpg')
-              const downloaded = await fetchImageToFile(urls[0], dest)
+              const downloaded = shouldUseInstagramDownloaders(downloadJob.url)
+                ? await downloadInstagramCdnImage(
+                    urls[0],
+                    downloadJob.url,
+                    dest,
+                    jobDir,
+                    'video'
+                  )
+                : await fetchImageToFile(urls[0], dest)
               filePath = await prepareTelegramPhoto(downloaded, jobDir)
             } else {
               const social = await deliverSocialImages(

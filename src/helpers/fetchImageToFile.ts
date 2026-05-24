@@ -1,6 +1,11 @@
 import { writeFile } from 'fs/promises'
 import env from '@/helpers/env'
 
+export interface ImageFetchHeaders {
+  referer?: string
+  userAgent?: string
+}
+
 function extFromContentType(ct: string | null): string {
   if (!ct) {
     return '.jpg'
@@ -34,15 +39,25 @@ function sniffExt(buf: Buffer): string {
 /** Download image; returns path written (extension matches real format). */
 export async function fetchImageToFile(
   url: string,
-  dest: string
+  dest: string,
+  headers?: ImageFetchHeaders
 ): Promise<string> {
+  const referer = headers?.referer ?? 'https://www.instagram.com/'
+  const userAgent =
+    headers?.userAgent ??
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+
   const res = await fetch(url, {
     signal: AbortSignal.timeout(45_000),
     headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      Referer: 'https://www.instagram.com/',
+      'User-Agent': userAgent,
+      Referer: referer,
+      Origin: 'https://www.instagram.com',
       Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Sec-Fetch-Dest': 'image',
+      'Sec-Fetch-Mode': 'no-cors',
+      'Sec-Fetch-Site': 'cross-site',
     },
   })
   if (!res.ok) {
