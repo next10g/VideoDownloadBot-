@@ -7,7 +7,10 @@ import type { YtDlpMetadata } from '@/services/ytdlpTypes'
 import {
   downloadInstagramEmbedVideo,
   isInstagramYtdlpBlocked,
+  probeInstagramEmbed,
 } from '@/services/instagramEmbedMedia'
+import { fetchInstagramVideoToFile } from '@/helpers/instagramCdnVideoFetch'
+import { resolveInstagramVideoViaApi } from '@/services/instagramPublicMedia'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
 
@@ -27,7 +30,41 @@ function isVideoFile(path: string): boolean {
   return /\.(mp4|m4v|mov|webm|mkv)$/i.test(path)
 }
 
-/** Download IG reel / video post via yt-dlp (no embed photo scrape). */
+async function tryEmbedVideoFirst(
+  url: string,
+  jobDir: string
+): Promise<{ filePath: string; info?: YtDlpMetadata } | undefined> {
+  if (!env.IG_EMBED_FALLBACK) {
+    return undefined
+  }
+  try {
+    const embed = await probeInstagramEmbed(url)
+    let videoUrl = embed.videoUrl
+    if (!videoUrl) {
+      videoUrl = await resolveInstagramVideoViaApi(url)
+    }
+    if (!videoUrl || /\.m3u8/i.test(videoUrl)) {
+      return undefined
+    }
+    const dest = join(jobDir, 'video.mp4')
+    await fetchInstagramVideoToFile(videoUrl, url, dest)
+    const { stat: fsStat } = await import('fs/promises')
+    const size = (await fsStat(dest)).size
+    if (size < 80_000 && /\/(reel|tv)\//i.test(url)) {
+      return undefined
+    }
+    logger.info('instagram video download ok', {
+      url,
+      bytes: size,
+      attempt: 'embed-cdn-first',
+    })
+    return { filePath: dest, info: { title: 'Instagram', ext: 'mp4' } }
+  } catch {
+    return undefined
+  }
+}
+
+/** Download IG reel / video post: embed CDN → yt-dlp (no cookies). */
 export async function runInstagramVideoDownload(
   url: string,
   jobDir: string,
@@ -35,6 +72,11 @@ export async function runInstagramVideoDownload(
   audio: boolean,
   maxHeight: number
 ): Promise<{ filePath: string; info?: YtDlpMetadata; stderr: string }> {
+  const embedFirst = await tryEmbedVideoFirst(url, jobDir)
+  if (embedFirst) {
+    return { ...embedFirst, stderr: '' }
+  }
+
   const attempts: Array<{ relaxed: boolean; label: string }> = [
     { relaxed: false, label: 'ig-video' },
     { relaxed: true, label: 'ig-video-relaxed' },

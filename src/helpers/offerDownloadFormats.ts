@@ -271,6 +271,45 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
         // fall through
       }
     }
+    if (
+      detail.includes('Unsupported URL') ||
+      (isValidationError(error) &&
+        (error.code === 'unsupported' || error.code === 'probe_failed'))
+    ) {
+      const { probeGenericPage } = await import('@/services/genericPageMedia')
+      const generic = await probeGenericPage(url)
+      if (generic) {
+        const jobUrl = generic.downloadUrl || url
+        if (generic.isFile || isGenericFileUrl(url)) {
+          return createDownloadJobAndRequest(ctx, jobUrl, {
+            downloadMode: DownloadMode.file,
+            maxHeight: 0,
+            audio: false,
+          })
+        }
+        if (generic.hasAlbum && generic.albumUrls.length > 1) {
+          return createDownloadJobAndRequest(ctx, jobUrl, {
+            downloadMode: DownloadMode.album,
+            maxHeight: 0,
+            audio: false,
+            albumUrls: generic.albumUrls,
+          })
+        }
+        if (generic.hasImage && generic.videoHeights.length === 0) {
+          return createDownloadJobAndRequest(ctx, jobUrl, {
+            downloadMode: DownloadMode.image,
+            maxHeight: 0,
+            audio: false,
+            albumUrls: generic.albumUrls,
+          })
+        }
+        return createDownloadJobAndRequest(ctx, jobUrl, {
+          downloadMode: DownloadMode.video,
+          maxHeight: 1080,
+          audio: false,
+        })
+      }
+    }
     const ytdlpKey = ytdlpErrorI18nKey(detail)
     if (ytdlpKey) {
       await editor.editMessage(ctx.i18n.t(ytdlpKey))

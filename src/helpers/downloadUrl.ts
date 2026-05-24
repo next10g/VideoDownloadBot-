@@ -61,6 +61,12 @@ import { sendPhotoAlbum } from '@/helpers/sendPhotoAlbum'
 import { collectImageUrlsFromInfo } from '@/helpers/extractImageUrlsFromInfo'
 import { prepareTelegramPhoto } from '@/helpers/prepareTelegramPhoto'
 import { isInstagramReelUrl } from '@/helpers/instagramUrl'
+import {
+  downloadGenericPageFile,
+  downloadGenericPageImages,
+  downloadGenericPageVideo,
+  shouldTryGenericPageProbe,
+} from '@/services/genericPageMedia'
 
 function escapeTitle(title: string | undefined): string {
   return (title || '').replace('<', '&lt;').replace('>', '&gt;')
@@ -168,6 +174,48 @@ async function resolveFromInfoJsonOnly(
     }
   }
   return undefined
+}
+
+async function tryGenericPageDownload(
+  pageUrl: string,
+  jobDir: string,
+  opts: {
+    wantImages: boolean
+    albumMode: boolean
+    fileMode: boolean
+    albumUrls?: string[]
+  }
+): Promise<ImageDelivery | undefined> {
+  if (!shouldTryGenericPageProbe(pageUrl)) {
+    return undefined
+  }
+  try {
+    if (opts.fileMode) {
+      const path = await downloadGenericPageFile(pageUrl, jobDir)
+      return { kind: 'single', path }
+    }
+    if (opts.wantImages) {
+      const paths = await downloadGenericPageImages(
+        pageUrl,
+        jobDir,
+        opts.albumUrls
+      )
+      if (paths.length > 1 || opts.albumMode) {
+        return { kind: 'album', paths }
+      }
+      if (paths.length === 1) {
+        return { kind: 'single', path: paths[0] }
+      }
+    }
+    const videoPath = await downloadGenericPageVideo(pageUrl, jobDir)
+    return { kind: 'single', path: videoPath }
+  } catch (error) {
+    logger.warn('generic page download failed', {
+      url: pageUrl,
+      detail: error instanceof Error ? error.message : String(error),
+    })
+    return undefined
+  }
 }
 
 async function deliverSocialImages(
@@ -519,11 +567,26 @@ export default async function downloadUrl(
               'download-images-fallback'
             )
           } else {
-            throw error
+            const generic = await tryGenericPageDownload(downloadJob.url, jobDir, {
+              wantImages,
+              albumMode,
+              fileMode,
+              albumUrls: downloadJob.albumUrls,
+            })
+            if (generic?.kind === 'album') {
+              photoPaths = generic.paths
+              info = { title: 'Album' } as YtDlpMetadata
+            } else if (generic?.kind === 'single') {
+              filePath = generic.path
+              info = { title: 'Media' } as YtDlpMetadata
+            } else {
+              throw error
+            }
           }
         }
       }
 
+      if (!filePath && !photoPaths?.length) {
       const entries = await readdir(jobDir)
       logger.info('download dir after yt-dlp', {
         jobId: downloadJob.id,
@@ -634,6 +697,7 @@ export default async function downloadUrl(
             throw new Error(`Download produced no file (${hint})`)
           }
         }
+      }
       }
     }
 

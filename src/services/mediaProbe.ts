@@ -168,6 +168,14 @@ function probeTimeoutMs(url: string): number {
 }
 
 async function probeInstagramUrl(url: string): Promise<MediaFormatOffer> {
+  if (env.IG_EMBED_FALLBACK && isInstagramReelUrl(url)) {
+    const { probeInstagramEmbedOffer } = await import('@/services/instagramEmbedMedia')
+    const embedOffer = await probeInstagramEmbedOffer(url)
+    if (embedOffer && embedOffer.videoHeights.length > 0) {
+      return embedOffer
+    }
+  }
+
   try {
     return await probeYtdlp(url)
   } catch (error) {
@@ -441,7 +449,21 @@ export async function probeMediaOffer(url: string): Promise<MediaFormatOffer> {
     return probeInstagramUrl(url)
   }
 
-  return probeYtdlp(url)
-
+  try {
+    return await probeYtdlp(url)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    const unsupported =
+      error instanceof ValidationError &&
+      (error.code === 'unsupported' || error.code === 'probe_failed')
+    if (unsupported || detail.includes('Unsupported URL')) {
+      const { probeGenericPage } = await import('@/services/genericPageMedia')
+      const generic = await probeGenericPage(url)
+      if (generic) {
+        return generic
+      }
+    }
+    throw error
+  }
 }
 

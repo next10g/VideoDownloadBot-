@@ -11,7 +11,8 @@ import { isInstagramReelUrl } from '@/helpers/instagramUrl'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
 import { stat } from 'fs/promises'
-import { downloadStreamToFile } from '@/services/youtubeStreamDownload'
+import { fetchInstagramVideoToFile } from '@/helpers/instagramCdnVideoFetch'
+import { resolveInstagramVideoViaApi } from '@/services/instagramPublicMedia'
 
 export interface InstagramEmbedOffer {
   title: string
@@ -56,7 +57,8 @@ function collectVideoUrls(html: string): string[] {
       const url = decodeJsonUrl(raw)
       if (
         url.startsWith('http') &&
-        /\.(mp4|m3u8)/i.test(url.split('?')[0]) &&
+        (/cdninstagram|fbcdn/i.test(url) ||
+          /\.(mp4|m3u8)/i.test(url.split('?')[0])) &&
         !seen.has(url)
       ) {
         seen.add(url)
@@ -119,14 +121,19 @@ export async function downloadInstagramEmbedVideo(
   dest: string
 ): Promise<string> {
   const embed = await probeInstagramEmbed(postUrl)
-  if (!embed.videoUrl) {
+  let videoUrl = embed.videoUrl
+
+  if (!videoUrl) {
+    videoUrl = await resolveInstagramVideoViaApi(postUrl)
+  }
+  if (!videoUrl) {
     throw new Error('No video URL in Instagram embed')
   }
-  const isHls = /\.m3u8/i.test(embed.videoUrl)
+  const isHls = /\.m3u8/i.test(videoUrl)
   if (isHls) {
     throw new Error('Instagram embed returned HLS only; yt-dlp required')
   }
-  await downloadStreamToFile(embed.videoUrl, dest, env.DOWNLOAD_TIMEOUT_MS, postUrl)
+  await fetchInstagramVideoToFile(videoUrl, postUrl, dest)
   const size = (await stat(dest)).size
   logger.info('instagram embed video download ok', { url: postUrl, bytes: size })
   return dest
