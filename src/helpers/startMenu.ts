@@ -1,7 +1,7 @@
 import { InlineKeyboard } from 'grammy'
 import type { DownloadPreference } from '@/models/DownloadPreference'
 import { getDownloadPreference, modeLabelKey } from '@/helpers/downloadPreference'
-import { collectBotStats } from '@/helpers/botStats'
+import { getCachedUserCount } from '@/helpers/cachedUserCount'
 import Context from '@/models/Context'
 import bot from '@/helpers/bot'
 import env from '@/helpers/env'
@@ -11,8 +11,7 @@ export async function buildWelcomeText(ctx: Context): Promise<string> {
   const pref = getDownloadPreference(ctx.dbchat)
   let userCount = '—'
   try {
-    const stats = await collectBotStats()
-    userCount = String(stats.totalUsers)
+    userCount = String(await getCachedUserCount())
   } catch {
     // optional
   }

@@ -1,3 +1,4 @@
+import { isBenignTelegramError } from '@/helpers/telegramErrors'
 import logger from '@/lib/logger'
 import { killAllYtdlpProcesses } from '@/services/ytdlpSpawn'
 import { sweepStaleTempDirs } from '@/helpers/tempMaintenance'
@@ -19,6 +20,9 @@ export function registerProcessLifecycle(): void {
   })
 
   process.on('unhandledRejection', (reason) => {
+    if (isBenignTelegramError(reason)) {
+      return
+    }
     logger.error('unhandledRejection', {
       reason: reason instanceof Error ? reason.message : String(reason),
       stack: reason instanceof Error ? reason.stack : undefined,

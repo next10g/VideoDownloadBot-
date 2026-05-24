@@ -34,7 +34,7 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
   const preference = getDownloadPreference(ctx.dbchat)
   ctx.dbchat.lastUrl = url
   ctx.dbchat.pendingUrl = url
-  await ctx.dbchat.save()
+  const saveChat = ctx.dbchat.save()
 
   if (isOnCooldown(ctx.dbchat.telegramId)) {
     const seconds = cooldownRemainingSeconds(ctx.dbchat.telegramId)
@@ -62,6 +62,7 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
 
   const statusMsg = await ctx.reply(ctx.i18n.t('status_validating'))
   const editor = new MessageEditor(statusMsg.message_id, ctx)
+  await saveChat
 
   try {
     const checkedUrl = await preflightUrl(url)

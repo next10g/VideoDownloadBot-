@@ -7,6 +7,7 @@ import Context from '@/models/Context'
 import report from '@/helpers/report'
 import bot from '@/helpers/bot'
 import env from '@/helpers/env'
+import { safeAnswerCallback } from '@/helpers/telegramErrors'
 
 function resolveDirectStream(
   parsed: { mode: DownloadMode; maxHeight: number },
@@ -26,8 +27,8 @@ function resolveDirectStream(
 }
 
 export async function handleFormatChoice(ctx: Context) {
-  await ctx.answerCallbackQuery()
   const data = ctx.callbackQuery?.data
+  await safeAnswerCallback(ctx)
   if (!data?.startsWith('fmt:')) {
     return
   }

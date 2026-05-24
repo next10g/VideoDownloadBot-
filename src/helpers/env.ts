@@ -36,7 +36,10 @@ const env = cleanEnv(process.env, {
     desc: 'Per-attempt timeout for Telegram file upload (large files on shared hosting)',
   }),
   UPLOAD_MAX_RETRIES: num({ default: 5 }),
-  YTDLP_PROBE_TIMEOUT_MS: num({ default: 90_000 }),
+  YTDLP_PROBE_TIMEOUT_MS: num({
+    default: 45_000,
+    desc: 'yt-dlp metadata probe max wait (lower = faster bot replies)',
+  }),
   QUEUE_JOB_TIMEOUT_MS: num({ default: 1_200_000 }),
   QUEUE_MAX_RETRIES: num({ default: 1 }),
   MAX_FILE_SIZE_MB: num({ default: 500 }),

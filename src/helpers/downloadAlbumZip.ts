@@ -1,14 +1,14 @@
-import * as archiver from 'archiver'
 import { createWriteStream } from 'fs'
 import { writeFile } from 'fs/promises'
 import { join } from 'path'
+import { pipeZipArchive } from '@/helpers/createZipArchive'
 import { createJobTempDir, removePathSafe } from '@/helpers/tempDir'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
 
 async function fetchToFile(url: string, dest: string): Promise<void> {
   const res = await fetch(url, {
-    signal: AbortSignal.timeout(60_000),
+    signal: AbortSignal.timeout(45_000),
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; EasyWayBot/1.0)' },
   })
   if (!res.ok) {
@@ -19,20 +19,6 @@ async function fetchToFile(url: string, dest: string): Promise<void> {
     throw new Error('image too large')
   }
   await writeFile(dest, buf)
-}
-
-async function buildZip(paths: string[], outPath: string): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const output = createWriteStream(outPath)
-    const archive = archiver('zip', { zlib: { level: 6 } })
-    output.on('close', () => resolve())
-    archive.on('error', reject)
-    archive.pipe(output)
-    paths.forEach((p, i) => {
-      archive.file(p, { name: `image_${i + 1}.jpg` })
-    })
-    void archive.finalize()
-  })
 }
 
 /** Download carousel images → single ZIP on disk. */
@@ -63,6 +49,10 @@ export async function downloadAlbumAsZip(
   }
 
   const zipPath = join(jobDir, 'album.zip')
-  await buildZip(paths, zipPath)
+  await pipeZipArchive(createWriteStream(zipPath), (archive) => {
+    paths.forEach((p, i) => {
+      archive.file(p, { name: `image_${i + 1}.jpg` })
+    })
+  })
   return zipPath
 }

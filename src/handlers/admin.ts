@@ -12,6 +12,10 @@ import {
   formatAdminUsersPage,
 } from '@/helpers/adminPanel'
 import { isBotAdmin } from '@/helpers/isBotAdmin'
+import {
+  safeAnswerCallback,
+  safeEditMessageText,
+} from '@/helpers/telegramErrors'
 import Context from '@/models/Context'
 import report from '@/helpers/report'
 
@@ -32,8 +36,7 @@ export async function handleAdminUsers(ctx: Context) {
     return
   }
   try {
-    const page = 0
-    const { text, keyboard } = await formatAdminUsersPage(page)
+    const { text, keyboard } = await formatAdminUsersPage(0)
     return ctx.reply(text, { parse_mode: 'HTML', reply_markup: keyboard })
   } catch (error) {
     report(error, { ctx, location: 'handleAdminUsers' })
@@ -77,7 +80,7 @@ async function showAdminUser(ctx: Context, telegramId: number, linkPage = 0) {
   }
 
   if (ctx.callbackQuery?.message) {
-    await ctx.editMessageText(text, { reply_markup: kb })
+    await safeEditMessageText(ctx, text, { reply_markup: kb })
   } else {
     await ctx.reply(text, { reply_markup: kb })
   }
@@ -85,17 +88,20 @@ async function showAdminUser(ctx: Context, telegramId: number, linkPage = 0) {
 
 export async function handleAdminCallback(ctx: Context) {
   if (!isBotAdmin(ctx)) {
-    await ctx.answerCallbackQuery()
+    await safeAnswerCallback(ctx)
     return
   }
-  await ctx.answerCallbackQuery()
+  await safeAnswerCallback(ctx)
+
   const data = ctx.callbackQuery?.data || ''
   try {
     if (data === 'admin:panel') {
       return handleAdminPanel(ctx)
     }
     if (data === 'admin:stats') {
-      await ctx.editMessageText(await formatAdminPanel(), { parse_mode: 'HTML' })
+      await safeEditMessageText(ctx, await formatAdminPanel(), {
+        parse_mode: 'HTML',
+      })
       return
     }
 
@@ -103,7 +109,7 @@ export async function handleAdminCallback(ctx: Context) {
     if (usersMatch) {
       const page = Math.max(0, Number(usersMatch[1]) || 0)
       const { text, keyboard } = await formatAdminUsersPage(page)
-      await ctx.editMessageText(text, {
+      await safeEditMessageText(ctx, text, {
         parse_mode: 'HTML',
         reply_markup: keyboard,
       })
@@ -134,7 +140,7 @@ export async function handleAdminCallback(ctx: Context) {
         .text('👥 مستخدمون', 'admin:users:0')
         .row()
         .text('« لوحة الأدمن', 'admin:panel')
-      await ctx.editMessageText(await formatAdminLinksPage(page), {
+      await safeEditMessageText(ctx, await formatAdminLinksPage(page), {
         parse_mode: 'HTML',
         reply_markup: kb,
       })

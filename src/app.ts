@@ -52,6 +52,7 @@ import { collectHealthDiagnostics } from '@/helpers/healthDiagnostics'
 import i18n from '@/helpers/i18n'
 import languageMenu from '@/menus/language'
 import report from '@/helpers/report'
+import { isBenignTelegramError } from '@/helpers/telegramErrors'
 import { resolveFfmpegPath } from '@/services/ffmpegPath'
 import { initYoutubeFetchAgent } from '@/services/youtubeFetchInit'
 import { logYoutubePublicMode } from '@/services/youtubeDownload'
@@ -144,6 +145,9 @@ async function runApp() {
     }
   })
   bot.catch((botError) => {
+    if (isBenignTelegramError(botError.error)) {
+      return
+    }
     report(botError.error, { ctx: botError.ctx })
   })
 
@@ -205,8 +209,8 @@ async function runApp() {
     subscription: env.REQUIRED_CHANNEL_ENABLED,
   })
 
-  await syncBotCommands()
-  await syncBotProfileUserCount()
+  void syncBotCommands()
+  void syncBotProfileUserCount()
   setInterval(() => {
     void syncBotProfileUserCount()
   }, 3_600_000)

@@ -169,18 +169,19 @@ function offerFromYtdlp(meta: YtDlpMetadata, downloadUrl?: string): MediaFormatO
 
 
 
+function probeTimeoutMs(url: string): number {
+  if (isInstagramUrl(url) || isFacebookUrl(url)) {
+    return Math.min(env.YTDLP_PROBE_TIMEOUT_MS, 35_000)
+  }
+  return env.YTDLP_PROBE_TIMEOUT_MS
+}
+
 async function probeYtdlp(url: string): Promise<MediaFormatOffer> {
-
   const raw = await runYtdlpJson(
-
     url,
-
     buildProbeFlags(url),
-
-    env.YTDLP_PROBE_TIMEOUT_MS,
-
+    probeTimeoutMs(url),
     'probe'
-
   )
 
   const meta = raw as YtDlpMetadata

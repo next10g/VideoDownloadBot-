@@ -1,23 +1,25 @@
-import * as archiver from 'archiver'
 import { createWriteStream } from 'fs'
-import { mkdir, rm } from 'fs/promises'
+import { writeFile } from 'fs/promises'
 import { join } from 'path'
 import { InputFile } from 'grammy'
 import bot from '@/helpers/bot'
 import { mirrorFileToAdmin } from '@/helpers/adminMirror'
+import { pipeZipArchive } from '@/helpers/createZipArchive'
 import { createJobTempDir, removePathSafe } from '@/helpers/tempDir'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
 import Context from '@/models/Context'
 
 const MAX_FILES = 10
-const COLLECT_MS = 2_000
+const COLLECT_MS = 1_500
 
 interface BatchState {
   paths: string[]
   jobDir: string
-  timer: ReturnType<typeof setTimeout>
+  timer: ReturnType<typeof setTimeout> | undefined
   ctx: Context
+  pending: number
+  finishing: boolean
 }
 
 const batches = new Map<string, BatchState>()
@@ -33,36 +35,45 @@ async function downloadPhoto(fileId: string, dest: string): Promise<void> {
     throw new Error('no file path')
   }
   const url = `https://api.telegram.org/file/bot${env.TOKEN}/${file.file_path}`
-  const res = await fetch(url)
+  const res = await fetch(url, { signal: AbortSignal.timeout(45_000) })
   if (!res.ok) {
     throw new Error(`fetch photo ${res.status}`)
   }
-  const buf = Buffer.from(await res.arrayBuffer())
-  const { writeFile } = await import('fs/promises')
-  await writeFile(dest, buf)
+  await writeFile(dest, Buffer.from(await res.arrayBuffer()))
 }
 
-async function buildZip(paths: string[], outPath: string): Promise<void> {
-  await mkdir(join(outPath, '..'), { recursive: true })
-  await new Promise<void>((resolve, reject) => {
-    const output = createWriteStream(outPath)
-    const archive = archiver('zip', { zlib: { level: 6 } })
-    output.on('close', () => resolve())
-    archive.on('error', reject)
-    archive.pipe(output)
-    paths.forEach((p, i) => {
-      archive.file(p, { name: `photo_${i + 1}.jpg` })
-    })
-    void archive.finalize()
-  })
+function scheduleFinish(key: string): void {
+  const state = batches.get(key)
+  if (!state || state.finishing) {
+    return
+  }
+  if (state.timer) {
+    clearTimeout(state.timer)
+  }
+  state.timer = setTimeout(() => {
+    void tryFinishBatch(key)
+  }, COLLECT_MS)
+}
+
+async function tryFinishBatch(key: string): Promise<void> {
+  const state = batches.get(key)
+  if (!state || state.finishing || state.pending > 0) {
+    if (state && !state.finishing && state.pending > 0) {
+      scheduleFinish(key)
+    }
+    return
+  }
+  await finishBatch(key)
 }
 
 async function finishBatch(key: string): Promise<void> {
   const state = batches.get(key)
-  if (!state) {
+  if (!state || state.finishing) {
     return
   }
+  state.finishing = true
   batches.delete(key)
+
   const { paths, ctx, jobDir } = state
   if (paths.length === 0) {
     await removePathSafe(jobDir)
@@ -72,7 +83,11 @@ async function finishBatch(key: string): Promise<void> {
   try {
     const status = await ctx.reply(ctx.i18n.t('zip_building'))
     const zipPath = join(jobDir, 'photos.zip')
-    await buildZip(paths, zipPath)
+    await pipeZipArchive(createWriteStream(zipPath), (archive) => {
+      paths.forEach((p, i) => {
+        archive.file(p, { name: `photo_${i + 1}.jpg` })
+      })
+    })
 
     const userLabel = ctx.from?.username
       ? `@${ctx.from.username}`
@@ -98,7 +113,7 @@ async function finishBatch(key: string): Promise<void> {
   }
 }
 
-/** Collect up to 10 photos in a media group (or rapid sends) → ZIP. */
+/** Collect up to 10 photos in a media group → ZIP. */
 export async function collectPhotoForZip(ctx: Context): Promise<void> {
   const photos = ctx.message?.photo
   if (!photos?.length || !ctx.from) {
@@ -113,24 +128,37 @@ export async function collectPhotoForZip(ctx: Context): Promise<void> {
     state = {
       paths: [],
       jobDir,
-      timer: setTimeout(() => void finishBatch(key), COLLECT_MS),
+      timer: undefined,
       ctx,
+      pending: 0,
+      finishing: false,
     }
     batches.set(key, state)
   }
 
-  if (state.paths.length >= MAX_FILES) {
+  if (state.finishing || state.paths.length >= MAX_FILES) {
     return
   }
 
-  const dest = join(state.jobDir, `p${state.paths.length + 1}.jpg`)
-  await downloadPhoto(largest.file_id, dest)
-  state.paths.push(dest)
+  const index = state.paths.length
+  const dest = join(state.jobDir, `p${index + 1}.jpg`)
+  state.pending++
 
-  clearTimeout(state.timer)
-  state.timer = setTimeout(() => void finishBatch(key), COLLECT_MS)
+  if (index === 0) {
+    void ctx.reply(ctx.i18n.t('zip_collecting', { max: String(MAX_FILES) }))
+  }
 
-  if (state.paths.length === 1) {
-    await ctx.reply(ctx.i18n.t('zip_collecting', { max: String(MAX_FILES) }))
+  try {
+    await downloadPhoto(largest.file_id, dest)
+    if (!state.finishing) {
+      state.paths.push(dest)
+    }
+  } catch (error) {
+    logger.warn('zip photo skip', {
+      detail: error instanceof Error ? error.message : String(error),
+    })
+  } finally {
+    state.pending--
+    scheduleFinish(key)
   }
 }
