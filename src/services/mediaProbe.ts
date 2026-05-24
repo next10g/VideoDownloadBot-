@@ -156,12 +156,12 @@ function isFacebookPhotoOrPost(url: string, downloadUrl: string): boolean {
 /** Probe link and decide which download buttons to show (no cookies). */
 export async function probeMediaOffer(url: string): Promise<MediaFormatOffer> {
   if (isFacebookUrl(url)) {
-    const downloadUrl = sanitizeFacebookUrl(await resolveFacebookUrl(url), url)
     const embed = await probeFacebookEmbed(url, FACEBOOK_PROBE_MS)
     if (embed && (embed.streams.length > 0 || embed.imageUrl)) {
       return offerFromFacebook(embed, url)
     }
 
+    const downloadUrl = sanitizeFacebookUrl(await resolveFacebookUrl(url), url)
     const photoOrPost = isFacebookPhotoOrPost(url, downloadUrl)
     logger.warn('facebook embed empty', {
       url,

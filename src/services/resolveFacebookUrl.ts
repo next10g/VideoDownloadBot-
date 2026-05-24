@@ -134,7 +134,88 @@ export function extractFacebookPermalinks(html: string): string[] {
     push(reel)
   }
 
+  for (const match of html.matchAll(
+    /https:\/\/(?:www\.)?facebook\.com\/[A-Za-z0-9._-]+\/posts\/pfbid[A-Za-z0-9]+/gi
+  )) {
+    push(match[0])
+  }
+
   return [...found]
+}
+
+/** Prefer pfbid/reel over photo.php — post.php embed works with pfbid on Hostinger. */
+export function rankFacebookPermalink(url: string, rawHint?: string): number {
+  if (/\/posts\/pfbid/i.test(url)) {
+    return 1000
+  }
+  if (/\/reel\/\d+/i.test(url)) {
+    return 900
+  }
+  if (/\/groups\/\d+\/permalink\//i.test(url)) {
+    return 850
+  }
+  if (/[?&]v=\d+/.test(url) || /\/watch\//i.test(url)) {
+    return 800
+  }
+  if (/photo\.php\?fbid=/i.test(url)) {
+    return 400
+  }
+  if (/story\.php/i.test(url)) {
+    return 300
+  }
+  if (rawHint?.includes('/share/v') && /reel|video|watch/i.test(url)) {
+    return 920
+  }
+  if (rawHint?.includes('/share/p') && /pfbid|photo/i.test(url)) {
+    return 950
+  }
+  return 100
+}
+
+export function pickBestFacebookPermalink(
+  urls: string[],
+  rawHint?: string
+): string | undefined {
+  const usable = urls.filter((u) => isUsableFacebookUrl(u))
+  if (usable.length === 0) {
+    return undefined
+  }
+  usable.sort(
+    (a, b) => rankFacebookPermalink(b, rawHint) - rankFacebookPermalink(a, rawHint)
+  )
+  return usable[0]
+}
+
+/** Fetch share/post page and return ranked permalinks (pfbid first). */
+export async function discoverFacebookPermalinks(
+  rawUrl: string,
+  timeoutMs: number
+): Promise<string[]> {
+  const candidates: string[] = []
+  const push = (u?: string) => {
+    if (u && isUsableFacebookUrl(u)) {
+      candidates.push(normalizeUrl(u))
+    }
+  }
+
+  try {
+    const html = await fetchFacebookHtml(rawUrl, timeoutMs, true)
+    for (const link of extractFacebookPermalinks(html)) {
+      push(link)
+    }
+  } catch {
+    // continue
+  }
+
+  const fromRedirects = await followRedirectChain(rawUrl, timeoutMs)
+  push(fromRedirects)
+
+  const unique = [...new Set(candidates)]
+  const best = pickBestFacebookPermalink(unique, rawUrl)
+  if (!best) {
+    return unique
+  }
+  return [best, ...unique.filter((u) => u !== best)]
 }
 
 export async function fetchFacebookHtml(
@@ -168,6 +249,8 @@ async function followRedirectChain(
 ): Promise<string | undefined> {
   const dispatcher = createFetchAgent(timeoutMs)
   let current = url
+  const candidates: string[] = []
+
   for (let i = 0; i < 12; i++) {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeoutMs)
@@ -188,7 +271,11 @@ async function followRedirectChain(
       ) {
         current = new URL(location, current).toString()
         if (isUsableFacebookUrl(current)) {
-          return normalizeUrl(current)
+          candidates.push(normalizeUrl(current))
+          const rank = rankFacebookPermalink(current, url)
+          if (rank >= 850) {
+            return pickBestFacebookPermalink(candidates, url)
+          }
         }
         continue
       }
@@ -196,22 +283,20 @@ async function followRedirectChain(
       if (response.ok) {
         const finalUrl = response.url || current
         if (isUsableFacebookUrl(finalUrl)) {
-          return normalizeUrl(finalUrl)
+          candidates.push(normalizeUrl(finalUrl))
         }
         const html = await response.text()
-        const extracted = extractFacebookPermalinks(html)
-        if (extracted.length > 0) {
-          return extracted[0]
-        }
+        candidates.push(...extractFacebookPermalinks(html))
+        return pickBestFacebookPermalink(candidates, url)
       }
-      return undefined
+      return pickBestFacebookPermalink(candidates, url)
     } catch {
-      return undefined
+      return pickBestFacebookPermalink(candidates, url)
     } finally {
       clearTimeout(timer)
     }
   }
-  return undefined
+  return pickBestFacebookPermalink(candidates, url)
 }
 
 async function resolveViaOembed(url: string, timeoutMs: number): Promise<string | undefined> {
@@ -281,7 +366,7 @@ export async function resolveFacebookUrl(url: string): Promise<string> {
     async () => {
       try {
         const html = await fetchFacebookHtml(normalized, timeoutMs, true)
-        return extractFacebookPermalinks(html)[0]
+        return pickBestFacebookPermalink(extractFacebookPermalinks(html), url)
       } catch {
         return undefined
       }
@@ -293,11 +378,12 @@ export async function resolveFacebookUrl(url: string): Promise<string> {
           timeoutMs,
           true
         )
-        return extractFacebookPermalinks(html)[0]
+        return pickBestFacebookPermalink(extractFacebookPermalinks(html), url)
       } catch {
         return undefined
       }
     },
+    () => discoverFacebookPermalinks(normalized, timeoutMs).then((l) => l[0]),
   ]
 
   for (const run of strategies) {

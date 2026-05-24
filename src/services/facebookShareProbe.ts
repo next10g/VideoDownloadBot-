@@ -1,4 +1,5 @@
 import { normalizeUrl } from '@/services/urlNormalize'
+import { discoverFacebookPermalinks } from '@/services/resolveFacebookUrl'
 
 /** Meta mobile "Copy link" — almost always /share/p|v|r|… */
 export function isFacebookShareLink(url: string): boolean {
@@ -35,6 +36,16 @@ export function shareEmbedHrefs(rawUrl: string, resolvedUrl?: string): string[] 
   }
 
   return [...new Set(out)]
+}
+
+/** Ranked permalinks from share page HTML (pfbid before photo.php). */
+export async function shareDiscoverHrefs(
+  rawUrl: string,
+  resolvedUrl: string | undefined,
+  timeoutMs: number
+): Promise<string[]> {
+  const discovered = await discoverFacebookPermalinks(rawUrl, timeoutMs)
+  return [...new Set([...discovered, ...shareEmbedHrefs(rawUrl, resolvedUrl)])]
 }
 
 export function sharePluginTargets(hrefs: string[]): string[] {

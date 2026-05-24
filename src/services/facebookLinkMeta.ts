@@ -78,13 +78,17 @@ export function sanitizeFacebookUrl(
       Boolean(rawHint?.includes('/share/p/')) ||
       u.pathname.includes('story.php')
 
-    if (storyFbid && isPhotoShare) {
+    if (storyFbid && isPhotoShare && !/\/posts\/pfbid/i.test(url)) {
       const photo = new URL('https://www.facebook.com/photo.php')
       photo.searchParams.set('fbid', storyFbid)
       if (pageId) {
         photo.searchParams.set('id', pageId)
       }
       return normalizeUrl(photo.toString())
+    }
+
+    if (/\/posts\/pfbid/i.test(url)) {
+      return normalizeUrl(u.toString())
     }
 
     if (metaIsVideo(u)) {

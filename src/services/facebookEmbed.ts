@@ -10,7 +10,7 @@ import {
 import {
   hrefFromPluginTarget,
   isFacebookShareLink,
-  shareEmbedHrefs,
+  shareDiscoverHrefs,
   sharePluginTargets,
 } from '@/services/facebookShareProbe'
 import {
@@ -319,10 +319,11 @@ async function probeShareLinksFirst(
   resolvedUrl: string | undefined,
   timeoutMs: number
 ): Promise<FacebookEmbedResult | null> {
-  const hrefs = shareEmbedHrefs(rawUrl, resolvedUrl)
-  const targets = sharePluginTargets(hrefs)
-  const perTargetMs = Math.min(8_000, Math.max(4_000, Math.floor(timeoutMs / targets.length)))
-  const resolved = resolvedUrl || hrefs[0]
+  const discoverMs = Math.min(10_000, Math.floor(timeoutMs * 0.45))
+  const hrefs = await shareDiscoverHrefs(rawUrl, resolvedUrl, discoverMs)
+  const targets = sharePluginTargets(hrefs.slice(0, 6))
+  const perTargetMs = Math.min(8_000, Math.max(4_000, Math.floor(timeoutMs / Math.max(targets.length, 1))))
+  const resolved = hrefs[0] || resolvedUrl || rawUrl
 
   const result = await scrapeTargets(
     targets,
@@ -338,7 +339,15 @@ async function probeShareLinksFirst(
       hasImage: Boolean(result.imageUrl),
       streams: result.streams.length,
     })
+    return result
   }
+
+  logger.warn('facebook share probe miss', {
+    rawUrl: rawUrl.slice(0, 90),
+    resolvedUrl: resolvedUrl?.slice(0, 90),
+    hrefs: hrefs.slice(0, 4),
+    targets: targets.length,
+  })
   return result
 }
 
