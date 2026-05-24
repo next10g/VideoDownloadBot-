@@ -1,4 +1,5 @@
 import { filterSocialImageUrls } from '@/helpers/filterSocialImageUrls'
+import { scrapeAllInstagramImages } from '@/helpers/instagramScrape'
 import { isFacebookUrl } from '@/helpers/facebookUrl'
 import { isInstagramUrl } from '@/helpers/instagramUrl'
 import logger from '@/lib/logger'
@@ -7,9 +8,6 @@ import { buildProbeFlags } from '@/services/ytdlpOptions'
 import { runYtdlpJson } from '@/services/ytdlpRunner'
 import type { YtDlpMetadata } from '@/services/ytdlpTypes'
 import env from '@/helpers/env'
-
-const IG_UA =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 
 export function isSocialCarouselUrl(url: string): boolean {
   return isInstagramUrl(url) || isFacebookUrl(url)
@@ -37,53 +35,11 @@ function probeTimeoutMs(url: string): number {
   return env.YTDLP_PROBE_TIMEOUT_MS
 }
 
-/** Public IG embed page — fallback when yt-dlp returns "no video in this post". */
+/** @deprecated Use scrapeAllInstagramImages */
 export async function scrapeInstagramEmbedImages(
   postUrl: string
 ): Promise<string[]> {
-  const base = postUrl.split('?')[0].replace(/\/$/, '')
-  const embedUrl = `${base}/embed/captioned/`
-  const res = await fetch(embedUrl, {
-    signal: AbortSignal.timeout(20_000),
-    headers: {
-      'User-Agent': IG_UA,
-      Accept: 'text/html',
-      Referer: 'https://www.instagram.com/',
-    },
-  })
-  if (!res.ok) {
-    return []
-  }
-  const html = await res.text()
-  const displayOnly = new Set<string>()
-  const displayRe = /"display_url":"([^"]+)"/g
-  let match: RegExpExecArray | null
-  while ((match = displayRe.exec(html))) {
-    const raw = match[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/')
-    if (raw.startsWith('http')) {
-      displayOnly.add(raw)
-    }
-  }
-  if (displayOnly.size > 0) {
-    return filterSocialImageUrls([...displayOnly], postUrl)
-  }
-
-  const urls = new Set<string>()
-  const patterns = [
-    /"display_resources":\[[^\]]*"src":"([^"]+)"/g,
-    /(https:\/\/[^\s"\\]+\.cdninstagram\.com\/[^\s"\\]+\.(?:jpg|jpeg|webp)[^\s"\\]*)/gi,
-  ]
-  for (const re of patterns) {
-    while ((match = re.exec(html))) {
-      const raw = (match[1] || match[0])
-        .replace(/\\u0026/g, '&')
-        .replace(/\\\//g, '/')
-      if (raw.startsWith('http')) {
-        urls.add(raw)
-      }
-    }
-  }
-  return filterSocialImageUrls([...urls], postUrl)
+  return scrapeAllInstagramImages(postUrl)
 }
 
 async function probeWithYtdlp(url: string, timeout: number): Promise<string[]> {
@@ -98,6 +54,13 @@ async function probeWithYtdlp(url: string, timeout: number): Promise<string[]> {
 /** Probe IG/FB post and return direct image URLs (carousel or single photo). */
 export async function probeSocialImageUrls(url: string): Promise<string[]> {
   const timeout = probeTimeoutMs(url)
+
+  if (isInstagramUrl(url)) {
+    const scraped = await scrapeAllInstagramImages(url)
+    if (scraped.length > 0) {
+      return scraped
+    }
+  }
 
   try {
     const urls = filterSocialImageUrls(
@@ -115,18 +78,7 @@ export async function probeSocialImageUrls(url: string): Promise<string[]> {
   }
 
   if (isInstagramUrl(url)) {
-    try {
-      const scraped = await scrapeInstagramEmbedImages(url)
-      if (scraped.length > 0) {
-        logger.info('instagram embed scrape ok', { url, count: scraped.length })
-        return scraped
-      }
-    } catch (error) {
-      logger.warn('instagram embed scrape failed', {
-        url,
-        detail: error instanceof Error ? error.message : String(error),
-      })
-    }
+    return scrapeAllInstagramImages(url)
   }
 
   return []

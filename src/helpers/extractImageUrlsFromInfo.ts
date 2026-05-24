@@ -1,5 +1,4 @@
 import { filterSocialImageUrls } from '@/helpers/filterSocialImageUrls'
-import { scrapeInstagramEmbedImages } from '@/helpers/socialCarousel'
 import { isInstagramUrl } from '@/helpers/instagramUrl'
 import { extractAlbumImageUrls } from '@/services/albumExtract'
 import type { YtDlpMetadata } from '@/services/ytdlpTypes'
@@ -20,16 +19,24 @@ export async function collectImageUrlsFromInfo(
 
   if (urls.size === 0) {
     const raw = JSON.stringify(info)
-    const re =
-      /https:\/\/[^"\\]+?(?:cdninstagram|fbcdn|instagram)[^"\\]*?\.(?:jpg|jpeg|webp|png)/gi
-    let match: RegExpExecArray | null
-    while ((match = re.exec(raw))) {
-      urls.add(match[0].replace(/\\u0026/g, '&').replace(/\\\//g, '/'))
+    const patterns = [
+      /https:\/\/[^"\\]+?(?:cdninstagram|fbcdn)[^"\\]*/gi,
+      /https:\/\/[^"\\]+?\.(?:jpg|jpeg|webp|png)[^"\\]*/gi,
+    ]
+    for (const re of patterns) {
+      let match: RegExpExecArray | null
+      while ((match = re.exec(raw))) {
+        const u = match[0].replace(/\\u0026/g, '&').replace(/\\\//g, '/')
+        if (/cdninstagram|fbcdn/i.test(u)) {
+          urls.add(u)
+        }
+      }
     }
   }
 
   if (urls.size === 0 && isInstagramUrl(pageUrl)) {
-    const scraped = await scrapeInstagramEmbedImages(pageUrl)
+    const { scrapeAllInstagramImages } = await import('@/helpers/instagramScrape')
+    const scraped = await scrapeAllInstagramImages(pageUrl)
     for (const u of scraped) {
       urls.add(u)
     }

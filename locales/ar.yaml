@@ -188,8 +188,8 @@ error_instagram_login: |
 error_instagram_private: |
   🔒 البوست ده خاص أو لحسابات متابعة فقط — البوت عام ومش بيسجّل دخول انستغرام.
 error_instagram_photo_only: |
-  📷 ده بوست صور على انستغرام — جرّب /carousel أو /auto.
-  لو لسه مش شغال، حدّث yt-dlp على السيرفر.
+  📷 مقدرناش نجيب صور البوست ده من انستغرام (بوست عام بس).
+  جرّب /image أو /carousel أو /auto.
 error_no_image: ❌ مفيش صورة في اللينك ده. جرّب /carousel أو /auto.
 error_youtube_cooldown: "⏳ يوتيوب: استنى ${seconds} ثانية قبل لينك تاني (البوت عام ومش بيستخدم حسابك)."
 error_youtube_bot: |

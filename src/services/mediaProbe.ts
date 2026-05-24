@@ -398,12 +398,24 @@ export async function probeMediaOffer(url: string): Promise<MediaFormatOffer> {
 
 
   if (isInstagramUrl(url)) {
-
     logger.info('instagram probe', { url })
-
+    const { probeSocialImageUrls } = await import('@/helpers/socialCarousel')
+    const albumUrls = await probeSocialImageUrls(url)
+    if (albumUrls.length > 0) {
+      return {
+        title: 'Instagram',
+        videoHeights: [],
+        imageSizes: [1080],
+        audioExts: [],
+        hasImage: true,
+        hasAudio: false,
+        downloadUrl: url,
+        albumUrls,
+        hasAlbum: albumUrls.length > 1,
+        isFile: false,
+      }
+    }
   }
-
-
 
   return probeYtdlp(url)
 

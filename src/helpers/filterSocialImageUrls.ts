@@ -33,8 +33,12 @@ function isLikelyIgPhoto(url: string): boolean {
   return /\.(jpe?g|webp|png)(\?|$)/i.test(url) || /\/v\/t\d+/i.test(url)
 }
 
-/** Keep one best-resolution URL per slide; drop tiny thumbnails. */
-export function filterSocialImageUrls(urls: string[], pageUrl?: string): string[] {
+function filterPass(
+  urls: string[],
+  pageUrl: string | undefined,
+  minScore: number,
+  requireIgPhoto: boolean
+): string[] {
   const byKey = new Map<string, { url: string; score: number }>()
 
   for (const raw of urls) {
@@ -42,11 +46,16 @@ export function filterSocialImageUrls(urls: string[], pageUrl?: string): string[
     if (!url.startsWith('http')) {
       continue
     }
-    if (pageUrl && isInstagramUrl(pageUrl) && !isLikelyIgPhoto(url)) {
+    if (
+      requireIgPhoto &&
+      pageUrl &&
+      isInstagramUrl(pageUrl) &&
+      !isLikelyIgPhoto(url)
+    ) {
       continue
     }
     const score = resolutionScore(url)
-    if (score < 150 * 150) {
+    if (score < minScore) {
       continue
     }
     const key = mediaKey(url)
@@ -59,4 +68,17 @@ export function filterSocialImageUrls(urls: string[], pageUrl?: string): string[
   return [...byKey.values()]
     .sort((a, b) => a.score - b.score)
     .map((v) => v.url)
+}
+
+/** Keep one best-resolution URL per slide; drop tiny thumbnails. */
+export function filterSocialImageUrls(urls: string[], pageUrl?: string): string[] {
+  const strict = filterPass(urls, pageUrl, 150 * 150, true)
+  if (strict.length > 0) {
+    return strict
+  }
+  const relaxed = filterPass(urls, pageUrl, 80 * 80, true)
+  if (relaxed.length > 0) {
+    return relaxed
+  }
+  return filterPass(urls, pageUrl, 0, false)
 }

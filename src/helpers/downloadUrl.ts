@@ -154,6 +154,29 @@ async function resolveFromInfoJsonOnly(
   return undefined
 }
 
+async function deliverSocialImages(
+  pageUrl: string,
+  jobDir: string,
+  wantImages: boolean
+): Promise<ImageDelivery | undefined> {
+  if (!wantImages || !isSocialCarouselUrl(pageUrl)) {
+    return undefined
+  }
+  const urls = await probeSocialImageUrls(pageUrl)
+  if (urls.length > 1) {
+    return { kind: 'album', paths: await downloadImagesToDir(urls, jobDir) }
+  }
+  if (urls.length === 1) {
+    const dest = join(jobDir, 'video.jpg')
+    await fetchImageToFile(urls[0], dest)
+    return {
+      kind: 'single',
+      path: await prepareTelegramPhoto(dest, jobDir),
+    }
+  }
+  return undefined
+}
+
 async function downloadCarouselEntriesFromInfo(
   info: YtDlpMetadata,
   jobDir: string
@@ -391,7 +414,18 @@ export default async function downloadUrl(
             } else if (retry?.kind === 'single') {
               filePath = retry.path
             } else {
-              throw new Error('Could not resolve downloaded file path')
+              const social = await deliverSocialImages(
+                downloadJob.url,
+                jobDir,
+                wantImages
+              )
+              if (social?.kind === 'album') {
+                photoPaths = social.paths
+              } else if (social?.kind === 'single') {
+                filePath = social.path
+              } else {
+                throw new Error('Could not resolve downloaded file path')
+              }
             }
           }
         }
@@ -412,8 +446,20 @@ export default async function downloadUrl(
             } else if (urls.length === 1) {
               filePath = join(jobDir, 'video.jpg')
               await fetchImageToFile(urls[0], filePath)
+              filePath = await prepareTelegramPhoto(filePath, jobDir)
             } else {
-              throw new Error(`Download produced no file (${hint})`)
+              const social = await deliverSocialImages(
+                downloadJob.url,
+                jobDir,
+                wantImages
+              )
+              if (social?.kind === 'album') {
+                photoPaths = social.paths
+              } else if (social?.kind === 'single') {
+                filePath = social.path
+              } else {
+                throw new Error(`Download produced no file (${hint})`)
+              }
             }
           } else if (isYoutubeBotBlock(hint)) {
             throw new Error(hint)

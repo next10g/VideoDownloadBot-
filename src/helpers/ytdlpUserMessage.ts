@@ -17,7 +17,10 @@ export function ytdlpErrorI18nKey(detail: string): string | undefined {
   if (lower.includes('login required')) {
     return 'error_instagram_private'
   }
-  if (lower.includes('no video in this post')) {
+  if (
+    lower.includes('no video in this post') &&
+    !lower.includes('could not resolve')
+  ) {
     return 'error_instagram_photo_only'
   }
   return undefined
