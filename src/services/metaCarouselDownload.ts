@@ -2,34 +2,30 @@ import { access } from 'fs/promises'
 import { join } from 'path'
 import { spawn } from 'child_process'
 import { fetchImageToFile } from '@/helpers/fetchImageToFile'
+import { fetchInstagramSlidesToDir } from '@/helpers/instagramCdnFetch'
 import { isFacebookUrl } from '@/helpers/facebookUrl'
 import { isInstagramReelUrl, isInstagramUrl } from '@/helpers/instagramUrl'
 import { scrapeAllInstagramImages } from '@/helpers/instagramScrape'
-import {
-  normalizeMediaUrl,
-  upscaleInstagramCdnUrl,
-} from '@/helpers/normalizeMediaUrl'
-import { prepareTelegramPhoto } from '@/helpers/prepareTelegramPhoto'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
 import { fetchFacebookHtml } from '@/services/resolveFacebookUrl'
-
-const IG_ANDROID_UA =
-  'Instagram 359.0.0.0.36 Android (33/13; 420dpi; 1080x2340; samsung; SM-G991B; o1s; exynos2100; en_US; 671551709)'
-
-const IG_DESKTOP_UA =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+import {
+  downloadYtdlpInstagramCarousel,
+  probeYtdlpInstagramCarousel,
+} from '@/services/instagramYtdlpCarousel'
 
 const FB_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 
 function unescapeFbUrl(raw: string): string {
-  return normalizeMediaUrl(
-    raw.replace(/\\u0025/g, '%').replace(/\\\//g, '/').replace(/\\"/g, '"')
-  )
+  return raw
+    .replace(/\\u0025/g, '%')
+    .replace(/\\\//g, '/')
+    .replace(/\\"/g, '"')
+    .replace(/&amp;/g, '&')
 }
 
-/** Probe carousel / multi-photo URLs (embed scrape — no yt-dlp). */
+/** Probe carousel / multi-photo URLs (embed scrape + yt-dlp metadata). */
 export async function probeMetaCarouselUrls(url: string): Promise<string[]> {
   if (isInstagramUrl(url) && !isInstagramReelUrl(url)) {
     return scrapeAllInstagramImages(url)
@@ -38,60 +34,6 @@ export async function probeMetaCarouselUrls(url: string): Promise<string[]> {
     return scrapeFacebookAlbumImages(url)
   }
   return []
-}
-
-async function fetchInstagramCdn(
-  imageUrl: string,
-  postUrl: string,
-  dest: string
-): Promise<string> {
-  const candidates = [
-    upscaleInstagramCdnUrl(imageUrl),
-    normalizeMediaUrl(imageUrl),
-  ]
-  const headerSets = [
-    { referer: postUrl, userAgent: IG_ANDROID_UA },
-    { referer: 'https://www.instagram.com/', userAgent: IG_DESKTOP_UA },
-  ]
-  let lastError: Error | undefined
-  for (const candidate of candidates) {
-    for (const headers of headerSets) {
-      try {
-        return await fetchImageToFile(candidate, dest, headers)
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error))
-      }
-    }
-  }
-  throw lastError ?? new Error('CDN fetch failed')
-}
-
-async function fetchSlidesToDir(
-  urls: string[],
-  pageUrl: string,
-  jobDir: string,
-  useIgHeaders: boolean
-): Promise<string[]> {
-  const paths: string[] = []
-  const limit = Math.min(urls.length, env.ALBUM_MAX_IMAGES)
-  for (let i = 0; i < limit; i++) {
-    const dest = join(jobDir, `slide${String(i + 1).padStart(2, '0')}.jpg`)
-    try {
-      const downloaded = useIgHeaders
-        ? await fetchInstagramCdn(urls[i], pageUrl, dest)
-        : await fetchImageToFile(urls[i], dest, {
-            referer: pageUrl,
-            userAgent: FB_UA,
-          })
-      paths.push(await prepareTelegramPhoto(downloaded, jobDir))
-    } catch (error) {
-      logger.warn('meta carousel slide skip', {
-        index: i,
-        detail: error instanceof Error ? error.message : String(error),
-      })
-    }
-  }
-  return paths
 }
 
 async function scrapeFacebookAlbumImages(url: string): Promise<string[]> {
@@ -127,6 +69,32 @@ async function scrapeFacebookAlbumImages(url: string): Promise<string[]> {
   }
 }
 
+async function fetchFbSlidesToDir(
+  urls: string[],
+  pageUrl: string,
+  jobDir: string
+): Promise<string[]> {
+  const { prepareTelegramPhoto } = await import('@/helpers/prepareTelegramPhoto')
+  const paths: string[] = []
+  const limit = Math.min(urls.length, env.ALBUM_MAX_IMAGES)
+  for (let i = 0; i < limit; i++) {
+    const dest = join(jobDir, `slide${String(i + 1).padStart(2, '0')}.jpg`)
+    try {
+      const downloaded = await fetchImageToFile(urls[i], dest, {
+        referer: pageUrl,
+        userAgent: FB_UA,
+      })
+      paths.push(await prepareTelegramPhoto(downloaded, jobDir))
+    } catch (error) {
+      logger.warn('meta carousel slide skip', {
+        index: i,
+        detail: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+  return paths
+}
+
 async function galleryDlBinary(): Promise<string | undefined> {
   const candidates = [
     env.GALLERY_DL_PATH_RESOLVED,
@@ -144,7 +112,6 @@ async function galleryDlBinary(): Promise<string | undefined> {
   return undefined
 }
 
-/** Optional gallery-dl fallback (if installed on server). */
 async function tryGalleryDlDownload(
   url: string,
   jobDir: string
@@ -171,7 +138,12 @@ async function tryGalleryDlDownload(
     child.stderr?.on('data', (chunk) => {
       stderr += String(chunk)
     })
+    const timer = setTimeout(() => {
+      child.kill('SIGTERM')
+      resolve([])
+    }, env.DOWNLOAD_TIMEOUT_MS)
     child.on('close', async (code) => {
+      clearTimeout(timer)
       if (code !== 0) {
         logger.warn('gallery-dl failed', {
           url,
@@ -183,6 +155,7 @@ async function tryGalleryDlDownload(
       }
       try {
         const { readdir } = await import('fs/promises')
+        const { prepareTelegramPhoto } = await import('@/helpers/prepareTelegramPhoto')
         const names = (await readdir(jobDir))
           .filter((n) => /\.(jpe?g|webp|png)$/i.test(n))
           .sort()
@@ -198,27 +171,28 @@ async function tryGalleryDlDownload(
         resolve([])
       }
     })
-    child.on('error', () => resolve([]))
+    child.on('error', () => {
+      clearTimeout(timer)
+      resolve([])
+    })
   })
 }
 
 /**
- * Download Instagram/Facebook carousel via embed HTML + direct CDN fetch.
- * Does not use yt-dlp (avoids single cropped slide on shared hosting).
+ * Download Instagram/Facebook carousel: embed (multi-UA) → CDN → yt-dlp → gallery-dl.
  */
 export async function downloadMetaCarousel(
   url: string,
   jobDir: string
 ): Promise<string[]> {
   const imageUrls = await probeMetaCarouselUrls(url)
+  const useIg = isInstagramUrl(url)
+
   if (imageUrls.length > 0) {
-    const paths = await fetchSlidesToDir(
-      imageUrls,
-      url,
-      jobDir,
-      isInstagramUrl(url)
-    )
-    if (paths.length > 0) {
+    const paths = useIg
+      ? await fetchInstagramSlidesToDir(imageUrls, url, jobDir)
+      : await fetchFbSlidesToDir(imageUrls, url, jobDir)
+    if (paths.length > 1) {
       logger.info('meta carousel download ok', {
         url,
         slides: paths.length,
@@ -226,11 +200,61 @@ export async function downloadMetaCarousel(
       })
       return paths
     }
+    if (paths.length === 1 && imageUrls.length === 1) {
+      logger.info('meta carousel download ok', {
+        url,
+        slides: 1,
+        source: 'embed-cdn-single',
+      })
+      return paths
+    }
+  }
+
+  if (useIg && !isInstagramReelUrl(url)) {
+    const ytdlpPaths = await downloadYtdlpInstagramCarousel(url, jobDir)
+    if (ytdlpPaths.length > 1) {
+      const { prepareTelegramPhoto } = await import('@/helpers/prepareTelegramPhoto')
+      const prepared = await Promise.all(
+        ytdlpPaths.map((p) => prepareTelegramPhoto(p, jobDir))
+      )
+      logger.info('meta carousel download ok', {
+        url,
+        slides: prepared.length,
+        source: 'yt-dlp',
+      })
+      return prepared
+    }
+    if (ytdlpPaths.length === 1 && !imageUrls.length) {
+      const { prepareTelegramPhoto } = await import('@/helpers/prepareTelegramPhoto')
+      return [await prepareTelegramPhoto(ytdlpPaths[0], jobDir)]
+    }
+
+    const ytdlpUrls = await probeYtdlpInstagramCarousel(url)
+    if (ytdlpUrls.length > imageUrls.length) {
+      const paths = await fetchInstagramSlidesToDir(ytdlpUrls, url, jobDir)
+      if (paths.length > 1) {
+        logger.info('meta carousel download ok', {
+          url,
+          slides: paths.length,
+          source: 'ytdlp-cdn',
+        })
+        return paths
+      }
+    }
   }
 
   const fromGalleryDl = await tryGalleryDlDownload(url, jobDir)
   if (fromGalleryDl.length > 0) {
     return fromGalleryDl
+  }
+
+  if (imageUrls.length === 1) {
+    const paths = useIg
+      ? await fetchInstagramSlidesToDir(imageUrls, url, jobDir)
+      : await fetchFbSlidesToDir(imageUrls, url, jobDir)
+    if (paths.length > 0) {
+      return paths
+    }
   }
 
   throw new Error('Meta carousel: no images downloaded')

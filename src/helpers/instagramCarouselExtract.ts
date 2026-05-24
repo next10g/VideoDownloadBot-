@@ -32,7 +32,7 @@ export function extractAllSlideDisplayUrls(html: string): string[] {
 }
 
 async function fetchPostHtml(postUrl: string): Promise<string> {
-  for (const ua of [IG_DESKTOP_UA, IG_UA]) {
+  for (const ua of [IG_UA, IG_DESKTOP_UA]) {
     try {
       const res = await fetch(postUrl.split('?')[0], {
         signal: AbortSignal.timeout(25_000),

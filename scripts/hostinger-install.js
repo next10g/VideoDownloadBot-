@@ -83,6 +83,40 @@ if (!run(nodeBin, ['scripts/ensure-ytdlp.js'])) {
   process.exit(1)
 }
 
+const galleryDlBin = path.join(process.cwd(), 'bin', 'gallery-dl')
+if (process.platform === 'linux' && !fs.existsSync(galleryDlBin)) {
+  const pipCandidates = [
+    '/opt/alt/alt-python311/bin/pip3.11',
+    '/opt/alt/alt-python310/bin/pip3.10',
+    'pip3',
+  ]
+  for (const pip of pipCandidates) {
+    if (pip.includes('/') && !fs.existsSync(pip)) {
+      continue
+    }
+    console.log('Trying gallery-dl install via', pip)
+    if (
+      run(pip, [
+        'install',
+        '--target',
+        path.join(process.cwd(), 'bin', 'gallery-dl-lib'),
+        'gallery-dl',
+      ])
+    ) {
+      break
+    }
+  }
+  const gdlScript = path.join(process.cwd(), 'bin', 'gallery-dl-lib', 'bin', 'gallery-dl')
+  if (fs.existsSync(gdlScript)) {
+    try {
+      fs.symlinkSync(gdlScript, galleryDlBin)
+      console.log('gallery-dl linked to bin/gallery-dl')
+    } catch {
+      console.warn('Could not symlink gallery-dl — set GALLERY_DL_PATH manually')
+    }
+  }
+}
+
 const ffmpegBin = path.join(process.cwd(), 'bin', 'ffmpeg')
 if (process.platform === 'linux' && !fs.existsSync(ffmpegBin)) {
   const ffScript = path.join(__dirname, 'install-ffmpeg.sh')

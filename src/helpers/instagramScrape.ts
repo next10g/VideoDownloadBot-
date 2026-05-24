@@ -7,15 +7,13 @@ import {
 } from '@/helpers/instagramHtmlExtract'
 import { filterSocialImageUrls } from '@/helpers/filterSocialImageUrls'
 import { normalizeMediaUrl } from '@/helpers/normalizeMediaUrl'
+import { fetchBestInstagramEmbedHtml } from '@/helpers/instagramEmbedFetch'
 import { isInstagramReelUrl } from '@/helpers/instagramUrl'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
 
 const IG_UA =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
-
-const IG_DESKTOP_UA =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 
 /** More than this usually means we scraped suggested posts / UI chrome. */
 const SCRAPE_SANITY_MAX = 15
@@ -107,14 +105,8 @@ async function fetchHtml(url: string, ua: string): Promise<string> {
 }
 
 async function scrapeEmbedHtml(postUrl: string): Promise<string> {
-  const base = postUrl.split('?')[0].replace(/\/$/, '')
-  for (const suffix of ['embed/captioned/', 'embed/']) {
-    const html = await fetchHtml(`${base}/${suffix}`, IG_DESKTOP_UA)
-    if (html) {
-      return html
-    }
-  }
-  return ''
+  const { html } = await fetchBestInstagramEmbedHtml(postUrl)
+  return html
 }
 
 async function scrapeOembed(postUrl: string): Promise<string[]> {
@@ -186,10 +178,25 @@ export async function scrapeAllInstagramImages(postUrl: string): Promise<string[
     raw = await scrapeOembed(postUrl)
   }
 
-  const filtered =
+  let filtered =
     raw.length > 1
       ? dedupeByAssetId(raw).slice(0, env.ALBUM_MAX_IMAGES)
       : filterSocialImageUrls(raw, postUrl).slice(0, env.ALBUM_MAX_IMAGES)
+
+  if (filtered.length <= 1) {
+    const { probeYtdlpInstagramCarousel } = await import(
+      '@/services/instagramYtdlpCarousel'
+    )
+    const ytdlpUrls = await probeYtdlpInstagramCarousel(postUrl)
+    if (ytdlpUrls.length > filtered.length) {
+      filtered = ytdlpUrls.slice(0, env.ALBUM_MAX_IMAGES)
+      logger.info('instagram scrape ytdlp fallback', {
+        url: postUrl,
+        count: filtered.length,
+      })
+    }
+  }
+
   if (filtered.length > 0) {
     logger.info('instagram scrape ok', {
       url: postUrl,

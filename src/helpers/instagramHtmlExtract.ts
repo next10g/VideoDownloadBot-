@@ -1,7 +1,11 @@
 import { normalizeMediaUrl, upscaleInstagramCdnUrl } from '@/helpers/normalizeMediaUrl'
 
-/** Instagram embed/page JSON escapes quotes as \\" */
-const DISPLAY_URL_RE = /display_url\\":\\"([^"]+)"|"display_url":"([^"]+)"/g
+/** Instagram embed JSON — escaping varies (\\", \\\", plain "). */
+const DISPLAY_URL_PATTERNS = [
+  /display_url\\":\\"([^"]+)"/g,
+  /display_url\\+":\\+"((?:https?:|\\\/)[^"\\]+(?:\\.[^"\\]*)*)/g,
+  /"display_url":"([^"]+)"/g,
+]
 
 const IMAGE_VERSIONS_URL_RE =
   /"width":(\d+)[^}]*"url":\\"([^"]+)"|"width":(\d+)[^}]*"url":"([^"]+)"/g
@@ -18,13 +22,17 @@ export function extractDisplayUrls(
 ): string[] {
   const slice = maxLen ? html.slice(start, start + maxLen) : html.slice(start)
   const urls: string[] = []
-  const re = new RegExp(DISPLAY_URL_RE.source, 'g')
-  let match: RegExpExecArray | null
-  while ((match = re.exec(slice))) {
-    const raw = match[1] || match[2] || ''
-    const url = decodeJsonUrl(raw)
-    if (url.startsWith('http')) {
-      urls.push(url)
+  const seen = new Set<string>()
+  for (const pattern of DISPLAY_URL_PATTERNS) {
+    const re = new RegExp(pattern.source, 'g')
+    let match: RegExpExecArray | null
+    while ((match = re.exec(slice))) {
+      const raw = match[1] || ''
+      const url = decodeJsonUrl(raw)
+      if (url.startsWith('http') && /cdninstagram|fbcdn/i.test(url) && !seen.has(url)) {
+        seen.add(url)
+        urls.push(url)
+      }
     }
   }
   return urls
