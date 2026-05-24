@@ -148,10 +148,17 @@ export function buildProbeFlags(sourceUrl?: string): YtDlpFlags {
     skipDownload: true,
     dumpSingleJson: true,
   }
+  if (
+    sourceUrl &&
+    (isInstagramUrl(sourceUrl) || isFacebookUrl(sourceUrl))
+  ) {
+    flags.noPlaylist = false
+  }
   if (sourceUrl && isFacebookUrl(sourceUrl)) {
     flags.addHeader = FB_HEADERS
   } else if (sourceUrl && isInstagramUrl(sourceUrl)) {
     flags.addHeader = IG_HEADERS
+    flags.ignoreNoFormatsError = true
   }
   return flags
 }
@@ -200,7 +207,7 @@ export function buildDownloadFlags(
 
   if (ffmpeg) {
     flags.ffmpegLocation = ffmpeg
-    if (!audio) {
+    if (!audio && !imageMode && !fileMode) {
       flags.mergeOutputFormat = 'mp4'
     }
     if (thumbs) {

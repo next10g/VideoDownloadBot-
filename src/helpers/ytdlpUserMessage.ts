@@ -11,5 +11,8 @@ export function ytdlpErrorI18nKey(detail: string): string | undefined {
   if (lower.includes('login required') || lower.includes('cookies')) {
     return 'error_instagram_login'
   }
+  if (lower.includes('no video in this post')) {
+    return 'error_instagram_photo_only'
+  }
   return undefined
 }

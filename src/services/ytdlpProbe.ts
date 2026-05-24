@@ -1,4 +1,5 @@
 import env from '@/helpers/env'
+import { isSocialCarouselMeta } from '@/helpers/socialCarousel'
 import { isYoutubeUrl } from '@/helpers/youtubeUrl'
 import { ValidationError } from '@/lib/errors'
 import logger from '@/lib/logger'
@@ -11,7 +12,10 @@ import { validationErrorFromYtdlp } from '@/helpers/ytdlpValidation'
 import { formatYtdlpError, runYtdlpJson } from '@/services/ytdlpRunner'
 import type { YtDlpMetadata } from '@/services/ytdlpTypes'
 
-function normalizeMetadata(raw: YtDlpMetadata): YtDlpMetadata {
+function normalizeMetadata(raw: YtDlpMetadata, url: string): YtDlpMetadata {
+  if (isSocialCarouselMeta(raw, url)) {
+    return raw
+  }
   if (raw._type === 'playlist' && raw.entries?.length === 1) {
     return raw.entries[0] || raw
   }
@@ -20,6 +24,9 @@ function normalizeMetadata(raw: YtDlpMetadata): YtDlpMetadata {
 
 export function validateMetadata(meta: YtDlpMetadata, url: string): void {
   if (meta._type === 'playlist' || (meta.entries && meta.entries.length > 1)) {
+    if (isSocialCarouselMeta(meta, url)) {
+      return
+    }
     throw new ValidationError('Playlists are not supported', 'playlist')
   }
 
@@ -103,7 +110,7 @@ export async function probeUrlMetadata(url: string): Promise<YtDlpMetadata> {
       env.YTDLP_PROBE_TIMEOUT_MS,
       'probe'
     )
-    const meta = normalizeMetadata(raw)
+    const meta = normalizeMetadata(raw, url)
     validateMetadata(meta, url)
     return meta
   } catch (error) {

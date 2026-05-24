@@ -185,6 +185,10 @@ error_instagram_restricted: |
   جرّب بوست عام أو انسخ اللينك من حساب عام.
 error_instagram_login: |
   🔐 انستغرام طالب تسجيل دخول للينك ده — البوت العام مش بيستخدم كوكيز.
+error_instagram_photo_only: |
+  📷 ده بوست صور على انستغرام — جرّب /carousel أو /auto.
+  لو لسه مش شغال، حدّث yt-dlp على السيرفر.
+error_no_image: ❌ مفيش صورة في اللينك ده. جرّب /carousel أو /auto.
 error_youtube_cooldown: "⏳ يوتيوب: استنى ${seconds} ثانية قبل لينك تاني (البوت عام ومش بيستخدم حسابك)."
 error_youtube_bot: |
   ▶️ يوتيوب مش متاح دلوقتي (السيرفر أو خدمة التحميل مشغولة).

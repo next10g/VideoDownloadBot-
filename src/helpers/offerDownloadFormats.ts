@@ -26,6 +26,8 @@ import {
   isOnYoutubeCooldown,
   youtubeCooldownRemainingSeconds,
 } from '@/helpers/youtubeCooldown'
+import { isFacebookUrl } from '@/helpers/facebookUrl'
+import { isInstagramUrl } from '@/helpers/instagramUrl'
 import { isYoutubeUrl } from '@/helpers/youtubeUrl'
 import { isGenericFileUrl } from '@/helpers/isGenericFileUrl'
 import { saveDbChat } from '@/helpers/saveDbChat'
@@ -57,7 +59,11 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
     return ctx.reply(ctx.i18n.t('error_youtube_disabled'))
   }
 
-  if (preference === 'image') {
+  if (
+    preference === 'image' &&
+    !isInstagramUrl(url) &&
+    !isFacebookUrl(url)
+  ) {
     return createDownloadJobAndRequest(ctx, rawUrl, {
       downloadMode: DownloadMode.image,
       maxHeight: 0,
@@ -85,7 +91,8 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
 
     const wantCarousel =
       preference === 'carousel' ||
-      (preference === 'auto' && offer.hasAlbum && offer.albumUrls.length > 0)
+      (preference === 'auto' &&
+        (offer.hasAlbum || offer.albumUrls.length > 1))
 
     if (wantCarousel && offer.albumUrls.length > 0) {
       return createDownloadJobAndRequest(ctx, jobUrl, {
@@ -98,6 +105,34 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
 
     if (preference === 'carousel') {
       await editor.editMessage(ctx.i18n.t('error_no_carousel'))
+      return
+    }
+
+    if (preference === 'image') {
+      if (offer.albumUrls.length > 1 || offer.hasAlbum) {
+        return createDownloadJobAndRequest(ctx, jobUrl, {
+          downloadMode: DownloadMode.album,
+          maxHeight: 0,
+          audio: false,
+          albumUrls: offer.albumUrls,
+        })
+      }
+      if (offer.albumUrls.length === 1) {
+        return createDownloadJobAndRequest(ctx, jobUrl, {
+          downloadMode: DownloadMode.image,
+          maxHeight: 0,
+          audio: false,
+          albumUrls: offer.albumUrls,
+        })
+      }
+      if (offer.hasImage || offer.videoHeights.length === 0) {
+        return createDownloadJobAndRequest(ctx, jobUrl, {
+          downloadMode: DownloadMode.image,
+          maxHeight: offer.imageSizes[0] ?? 0,
+          audio: false,
+        })
+      }
+      await editor.editMessage(ctx.i18n.t('error_no_image'))
       return
     }
 
@@ -128,9 +163,20 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
     }
 
     if (!env.SHOW_FORMAT_MENU && preference === 'auto') {
-      if (offer.hasAlbum && offer.albumUrls.length > 0) {
+      if (
+        offer.albumUrls.length > 0 &&
+        (offer.hasAlbum || offer.albumUrls.length > 1)
+      ) {
         return createDownloadJobAndRequest(ctx, jobUrl, {
           downloadMode: DownloadMode.album,
+          maxHeight: 0,
+          audio: false,
+          albumUrls: offer.albumUrls,
+        })
+      }
+      if (offer.albumUrls.length === 1) {
+        return createDownloadJobAndRequest(ctx, jobUrl, {
+          downloadMode: DownloadMode.image,
           maxHeight: 0,
           audio: false,
           albumUrls: offer.albumUrls,

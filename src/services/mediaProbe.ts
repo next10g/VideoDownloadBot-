@@ -159,7 +159,7 @@ function offerFromYtdlp(meta: YtDlpMetadata, downloadUrl?: string): MediaFormatO
 
     albumUrls,
 
-    hasAlbum: albumUrls.length > 1,
+    hasAlbum: albumUrls.length > 1 || Boolean(meta.entries && meta.entries.length > 1),
 
     isFile: downloadUrl ? isGenericFileUrl(downloadUrl) : false,
 
@@ -177,17 +177,45 @@ function probeTimeoutMs(url: string): number {
 }
 
 async function probeYtdlp(url: string): Promise<MediaFormatOffer> {
-  const raw = await runYtdlpJson(
-    url,
-    buildProbeFlags(url),
-    probeTimeoutMs(url),
-    'probe'
-  )
+  const timeout = probeTimeoutMs(url)
+  let meta: YtDlpMetadata
+  try {
+    meta = (await runYtdlpJson(
+      url,
+      buildProbeFlags(url),
+      timeout,
+      'probe'
+    )) as YtDlpMetadata
+  } catch (error) {
+    const detail =
+      error instanceof Error ? error.message : String(error)
+    if (
+      isInstagramUrl(url) &&
+      detail.toLowerCase().includes('no video in this post')
+    ) {
+      const { probeSocialImageUrls } = await import('@/helpers/socialCarousel')
+      const albumUrls = await probeSocialImageUrls(url)
+      if (albumUrls.length > 0) {
+        return {
+          title: 'Instagram',
+          videoHeights: [],
+          imageSizes: [1080],
+          audioExts: [],
+          hasImage: true,
+          hasAudio: false,
+          downloadUrl: url,
+          albumUrls,
+          hasAlbum: albumUrls.length > 1,
+          isFile: false,
+        }
+      }
+    }
+    throw error
+  }
 
-  const meta = raw as YtDlpMetadata
   const albumUrls = extractAlbumImageUrls(meta)
 
-  if (albumUrls.length > 1) {
+  if (albumUrls.length > 1 || (meta.entries && meta.entries.length > 1)) {
     return offerFromYtdlp(meta, url)
   }
 
@@ -196,7 +224,6 @@ async function probeYtdlp(url: string): Promise<MediaFormatOffer> {
   }
 
   return offerFromYtdlp(meta, url)
-
 }
 
 

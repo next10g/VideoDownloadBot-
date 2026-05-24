@@ -1,7 +1,6 @@
 import { readFile, readdir, stat } from 'fs/promises'
 import { join } from 'path'
 import { DocumentType } from '@typegoose/typegoose'
-import { InputFile } from 'grammy'
 import { findOrCreateChat } from '@/models/Chat'
 import { DownloadMode } from '@/models/DownloadMode'
 import { findOrCreateUrl } from '@/models/Url'
@@ -45,6 +44,12 @@ import { recordUserDownload } from '@/helpers/userDownloadStats'
 import { saveUserLink } from '@/helpers/userLibrary'
 import { resolveDownloadedMediaPath } from '@/helpers/resolveDownloadedFile'
 import { ytdlpErrorI18nKey } from '@/helpers/ytdlpUserMessage'
+import { fetchImageToFile } from '@/helpers/fetchImageToFile'
+import {
+  isSocialCarouselUrl,
+  probeSocialImageUrls,
+} from '@/helpers/socialCarousel'
+import { extractAlbumImageUrls } from '@/services/albumExtract'
 
 function escapeTitle(title: string | undefined): string {
   return (title || '').replace('<', '&lt;').replace('>', '&gt;')
@@ -154,6 +159,27 @@ export default async function downloadUrl(
       filePath = ''
     }
 
+    const isSocial = isSocialCarouselUrl(downloadJob.url)
+
+    if (
+      !filePath &&
+      isSocial &&
+      (imageMode || albumMode || downloadJob.albumUrls?.length)
+    ) {
+      const imageUrls =
+        downloadJob.albumUrls?.filter(Boolean).length
+          ? downloadJob.albumUrls!
+          : await probeSocialImageUrls(downloadJob.url)
+      if (imageUrls.length > 1) {
+        filePath = await downloadAlbumAsZip(imageUrls, jobId)
+        info = { title: 'Album' } as YtDlpMetadata
+      } else if (imageUrls.length === 1) {
+        filePath = join(jobDir, 'video.jpg')
+        await fetchImageToFile(imageUrls[0], filePath)
+        info = { title: 'Photo', ext: 'jpg' } as YtDlpMetadata
+      }
+    }
+
     let directUrl = downloadJob.directStreamUrl
 
     if (!directUrl && isFacebookUrl(downloadJob.url)) {
@@ -216,8 +242,21 @@ export default async function downloadUrl(
 
       info = await readInfoJson(jobDir, 'video')
       if (info) {
-        validateMetadata(info, downloadJob.url)
-        filePath = await resolveDownloadedPath(info, jobDir, 'video', imageMode)
+        const albumUrls = extractAlbumImageUrls(info)
+        if (isSocial && albumUrls.length > 1) {
+          filePath = await downloadAlbumAsZip(albumUrls, jobId)
+        } else if (isSocial && imageMode && albumUrls.length === 1) {
+          filePath = join(jobDir, 'video.jpg')
+          await fetchImageToFile(albumUrls[0], filePath)
+        } else {
+          validateMetadata(info, downloadJob.url)
+          filePath = await resolveDownloadedPath(
+            info,
+            jobDir,
+            'video',
+            imageMode
+          )
+        }
       } else {
         try {
           filePath = await resolveDownloadedMediaPath(
@@ -321,7 +360,12 @@ export default async function downloadUrl(
     metrics.increment('failedDownloads')
     recordDownloadFailure(downloadJob.originalChatId)
     if (error instanceof Error) {
-      const i18nKey = ytdlpErrorI18nKey(error.message)
+      const msg = error.message
+      const i18nKey =
+        ytdlpErrorI18nKey(msg) ||
+        (msg.toLowerCase().includes('no video in this post')
+          ? 'error_instagram_photo_only'
+          : undefined)
       if (i18nKey) {
         downloadJob.failureI18nKey = i18nKey
       }
