@@ -4,9 +4,12 @@ import { fetchInstagramCdnToFile } from '@/helpers/instagramCdnFetch'
 import { prepareTelegramPhoto } from '@/helpers/prepareTelegramPhoto'
 import {
   dedupeByAssetId,
-  decodeJsonUrl,
   extractDisplayUrls,
 } from '@/helpers/instagramHtmlExtract'
+import {
+  extractInstagramVideoCandidates,
+  pickBestInstagramVideo,
+} from '@/helpers/instagramVideoExtract'
 import { isInstagramReelUrl } from '@/helpers/instagramUrl'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
@@ -27,14 +30,6 @@ export interface InstagramEmbedOffer {
   isFile: boolean
 }
 
-const VIDEO_URL_PATTERNS = [
-  /video_url\\":\\"([^"]+)"/g,
-  /"video_url":"([^"]+)"/g,
-  /playback_url\\":\\"([^"]+)"/g,
-  /"playback_url":"([^"]+)"/g,
-  /video_dash_manifest\\":\\"([^"]+)"/g,
-]
-
 export function isInstagramYtdlpBlocked(detail: string): boolean {
   const lower = detail.toLowerCase()
   return (
@@ -46,46 +41,41 @@ export function isInstagramYtdlpBlocked(detail: string): boolean {
   )
 }
 
-function collectVideoUrls(html: string): string[] {
-  const urls: string[] = []
-  const seen = new Set<string>()
-  for (const pattern of VIDEO_URL_PATTERNS) {
-    const re = new RegExp(pattern.source, 'g')
-    let match: RegExpExecArray | null
-    while ((match = re.exec(html))) {
-      const raw = match[1] || ''
-      const url = decodeJsonUrl(raw)
-      if (
-        url.startsWith('http') &&
-        (/cdninstagram|fbcdn/i.test(url) ||
-          /\.(mp4|m3u8)/i.test(url.split('?')[0])) &&
-        !seen.has(url)
-      ) {
-        seen.add(url)
-        urls.push(url)
-      }
-    }
-  }
-  urls.sort((a, b) => b.length - a.length)
-  return urls
-}
-
 export interface InstagramEmbedProbe {
   imageUrls: string[]
   videoUrl?: string
 }
 
 export async function probeInstagramEmbed(url: string): Promise<InstagramEmbedProbe> {
-  const { html } = await fetchBestInstagramEmbedHtml(url)
-  if (!html) {
+  const { html: embedHtml } = await fetchBestInstagramEmbedHtml(url)
+  const { fetchInstagramPageHtml, resolveInstagramVideoViaApi } = await import(
+    '@/services/instagramPublicMedia'
+  )
+
+  let mergedHtml = embedHtml || ''
+  if (isInstagramReelUrl(url)) {
+    const pageHtml = await fetchInstagramPageHtml(url)
+    if (pageHtml) {
+      mergedHtml = `${mergedHtml}\n${pageHtml}`
+    }
+  }
+
+  let videoUrl = pickBestInstagramVideo(
+    extractInstagramVideoCandidates(mergedHtml)
+  )?.url
+
+  if (!videoUrl && isInstagramReelUrl(url)) {
+    videoUrl = await resolveInstagramVideoViaApi(url)
+  }
+
+  const imageUrls = mergedHtml
+    ? dedupeByAssetId(extractDisplayUrls(mergedHtml)).slice(0, env.ALBUM_MAX_IMAGES)
+    : []
+
+  if (!mergedHtml && !videoUrl) {
     return { imageUrls: [] }
   }
-  const imageUrls = dedupeByAssetId(extractDisplayUrls(html)).slice(
-    0,
-    env.ALBUM_MAX_IMAGES
-  )
-  const videoCandidates = collectVideoUrls(html)
-  const videoUrl = videoCandidates.find((u) => /\.mp4/i.test(u)) || videoCandidates[0]
+
   return { imageUrls, videoUrl }
 }
 

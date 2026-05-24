@@ -30,6 +30,57 @@ function isVideoFile(path: string): boolean {
   return /\.(mp4|m4v|mov|webm|mkv)$/i.test(path)
 }
 
+async function downloadResolvedVideo(
+  videoUrl: string,
+  url: string,
+  jobDir: string,
+  label: string
+): Promise<{ filePath: string; info?: YtDlpMetadata } | undefined> {
+  const dest = join(jobDir, 'video.mp4')
+
+  if (/\.m3u8/i.test(videoUrl)) {
+    try {
+      await runYtdlpDownload(
+        videoUrl,
+        {
+          output: join(jobDir, 'video.%(ext)s'),
+          format: 'best[ext=mp4]/best',
+          noPlaylist: true,
+          quiet: true,
+          noWarnings: true,
+        },
+        Math.min(env.DOWNLOAD_TIMEOUT_MS, 180_000),
+        'ig-hls'
+      )
+      const { stat: fsStat } = await import('fs/promises')
+      const entries = await readdir(jobDir)
+      const media = entries.find((n) => isVideoFile(n))
+      if (!media) {
+        throw new Error('HLS download produced no file')
+      }
+      const filePath = join(jobDir, media)
+      const size = (await fsStat(filePath)).size
+      logger.info('instagram video download ok', { url, bytes: size, attempt: label })
+      return { filePath, info: { title: 'Instagram', ext: 'mp4' } }
+    } catch (error) {
+      logger.warn('instagram hls yt-dlp failed', {
+        url,
+        detail: error instanceof Error ? error.message : String(error),
+      })
+      return undefined
+    }
+  }
+
+  await fetchInstagramVideoToFile(videoUrl, url, dest)
+  const { stat: fsStat } = await import('fs/promises')
+  const size = (await fsStat(dest)).size
+  if (size < 80_000 && /\/(reel|tv)\//i.test(url)) {
+    throw new Error('Instagram video too small')
+  }
+  logger.info('instagram video download ok', { url, bytes: size, attempt: label })
+  return { filePath: dest, info: { title: 'Instagram', ext: 'mp4' } }
+}
+
 async function tryEmbedVideoFirst(
   url: string,
   jobDir: string
@@ -43,23 +94,34 @@ async function tryEmbedVideoFirst(
     if (!videoUrl) {
       videoUrl = await resolveInstagramVideoViaApi(url)
     }
-    if (!videoUrl || /\.m3u8/i.test(videoUrl)) {
+    if (!videoUrl) {
       return undefined
     }
-    const dest = join(jobDir, 'video.mp4')
-    await fetchInstagramVideoToFile(videoUrl, url, dest)
-    const { stat: fsStat } = await import('fs/promises')
-    const size = (await fsStat(dest)).size
-    if (size < 80_000 && /\/(reel|tv)\//i.test(url)) {
-      return undefined
-    }
-    logger.info('instagram video download ok', {
+    return await downloadResolvedVideo(videoUrl, url, jobDir, 'embed-cdn-first')
+  } catch (error) {
+    logger.warn('instagram embed-first failed', {
       url,
-      bytes: size,
-      attempt: 'embed-cdn-first',
+      detail: error instanceof Error ? error.message : String(error),
     })
-    return { filePath: dest, info: { title: 'Instagram', ext: 'mp4' } }
-  } catch {
+    return undefined
+  }
+}
+
+async function tryApiVideoBeforeYtdlp(
+  url: string,
+  jobDir: string
+): Promise<{ filePath: string; info?: YtDlpMetadata } | undefined> {
+  try {
+    const videoUrl = await resolveInstagramVideoViaApi(url)
+    if (!videoUrl) {
+      return undefined
+    }
+    return await downloadResolvedVideo(videoUrl, url, jobDir, 'graphql-page')
+  } catch (error) {
+    logger.warn('instagram api path failed', {
+      url,
+      detail: error instanceof Error ? error.message : String(error),
+    })
     return undefined
   }
 }
@@ -75,6 +137,11 @@ export async function runInstagramVideoDownload(
   const embedFirst = await tryEmbedVideoFirst(url, jobDir)
   if (embedFirst) {
     return { ...embedFirst, stderr: '' }
+  }
+
+  const apiFirst = await tryApiVideoBeforeYtdlp(url, jobDir)
+  if (apiFirst) {
+    return { ...apiFirst, stderr: '' }
   }
 
   const attempts: Array<{ relaxed: boolean; label: string }> = [
@@ -154,6 +221,15 @@ export async function runInstagramVideoDownload(
 
   if (isInstagramYtdlpBlocked(lastStderr)) {
     try {
+      const videoUrl =
+        (await probeInstagramEmbed(url)).videoUrl ||
+        (await resolveInstagramVideoViaApi(url))
+      if (videoUrl) {
+        const result = await downloadResolvedVideo(videoUrl, url, jobDir, 'embed-cdn')
+        if (result) {
+          return { ...result, stderr: '' }
+        }
+      }
       const dest = join(jobDir, 'video.mp4')
       await downloadInstagramEmbedVideo(url, dest)
       const { stat: fsStat } = await import('fs/promises')

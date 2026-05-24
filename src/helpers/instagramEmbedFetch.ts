@@ -2,6 +2,8 @@ import {
   dedupeByAssetId,
   extractDisplayUrls,
 } from '@/helpers/instagramHtmlExtract'
+import { extractInstagramVideoCandidates } from '@/helpers/instagramVideoExtract'
+import { isInstagramReelUrl } from '@/helpers/instagramUrl'
 import logger from '@/lib/logger'
 
 const IG_IPHONE_UA =
@@ -44,12 +46,18 @@ async function fetchEmbedWithUa(
   }
 }
 
-function scoreEmbedHtml(html: string): number {
+function scoreEmbedHtml(html: string, postUrl: string): number {
   if (!html || html.length < 500) {
     return 0
   }
   if (/login_required|LoginAndSignupPage/i.test(html)) {
     return 0
+  }
+  if (isInstagramReelUrl(postUrl)) {
+    const videos = extractInstagramVideoCandidates(html)
+    if (videos.length > 0) {
+      return 1000 + videos[0].width
+    }
   }
   return dedupeByAssetId(extractDisplayUrls(html)).length
 }
@@ -66,7 +74,7 @@ export async function fetchBestInstagramEmbedHtml(
   for (const ua of EMBED_USER_AGENTS) {
     for (const suffix of ['embed/captioned/', 'embed/']) {
       const html = await fetchEmbedWithUa(`${base}/${suffix}`, ua)
-      const count = scoreEmbedHtml(html)
+      const count = scoreEmbedHtml(html, postUrl)
       if (count > bestCount) {
         bestCount = count
         bestHtml = html
