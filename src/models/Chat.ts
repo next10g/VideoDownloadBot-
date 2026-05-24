@@ -5,12 +5,16 @@ import {
   modelOptions,
   plugin,
   prop,
+  Severity,
 } from '@typegoose/typegoose'
 import { randomBytes } from 'crypto'
 import type { DownloadPreference } from '@/models/DownloadPreference'
 
 @plugin(findorcreate)
-@modelOptions({ schemaOptions: { timestamps: true } })
+@modelOptions({
+  schemaOptions: { timestamps: true },
+  options: { allowMixed: Severity.ALLOW },
+})
 export class Chat extends FindOrCreate {
   @prop({ required: true, index: true, unique: true })
   telegramId!: number

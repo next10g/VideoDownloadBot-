@@ -183,11 +183,9 @@ error_youtube_bot: |
   البوت <b>عام</b> — مفيش حاجة تسجّلها من جهازك.
 
   @Dev_Nour_M لو استمرّت المشكلة
-error_private_bot: |
-  🔒 الأمر ده مش متاح.
-
-mylinks_empty: مفيش روابط محفوظة لسه. نزّل حاجة الأول 😊
-mylinks_header: 📚 روابطك المحفوظة (آخر 20):
+error_private_bot: "🔒 الأمر ده مش متاح."
+mylinks_empty: "مفيش روابط محفوظة لسه. نزّل حاجة الأول 😊"
+mylinks_header: "📚 روابطك المحفوظة (آخر 20)"
 statsme_body: |
   📊 إحصائياتك
 
@@ -196,7 +194,7 @@ statsme_body: |
   روابط أرسلتها: ${links}
 
   حسب النوع:
-${types}
+  ${types}
 zip_hint: ابعت لحد 10 صور ورا بعض (أو ألبوم صور). هتتجمع وتتبعتلك ZIP.
 zip_collecting: بجمع الصور… (${max} كحد أقصى)
 zip_building: بضغط الصور…
