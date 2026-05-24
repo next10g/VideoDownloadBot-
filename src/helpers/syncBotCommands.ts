@@ -9,6 +9,7 @@ const PUBLIC_COMMANDS = [
   { command: 'video', description: 'فيديو + جودات' },
   { command: 'audio', description: 'صوت فقط' },
   { command: 'image', description: 'صورة فقط' },
+  { command: 'carousel', description: 'كاروسيل صور (فيس/انستا)' },
   { command: 'help', description: 'المساعدة' },
   { command: 'language', description: 'اللغة' },
   { command: 'refer', description: 'دعوة الأصدقاء' },

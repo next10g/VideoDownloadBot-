@@ -17,6 +17,7 @@ import handleAudio from '@/handlers/audio'
 import handleImage from '@/handlers/image'
 import {
   handleAutoMode,
+  handleCarouselMode,
   handleModeCallback,
   handleMenuCallback,
   handleVideoMode,
@@ -112,6 +113,7 @@ async function runApp() {
   bot.command('language', handleLanguage)
   bot.command('audio', handleAudio)
   bot.command('image', handleImage)
+  bot.command('carousel', handleCarouselMode)
   bot.command('auto', handleAutoMode)
   bot.command('video', handleVideoMode)
   bot.command('refer', handleRefer)

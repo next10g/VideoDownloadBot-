@@ -24,11 +24,12 @@ welcome_menu: |
   وضعك الحالي: ${mode}
 
   من الأزرار أو:
-  /auto · /video · /audio · /image · /mylinks · /statsme · /zip · /sticker
+  /auto · /video · /audio · /image · /carousel · /mylinks · /statsme · /zip · /sticker
 mode_label_auto: ذكي (تلقائي)
 mode_label_video: فيديو
 mode_label_audio: صوت
 mode_label_image: صورة
+mode_label_carousel: كاروسيل صور
 mode_changed: |
   ✅ تم — الوضع دلوقتي: ${mode}
 
@@ -175,6 +176,15 @@ error_user_blocked: 🚫 محاولات فاشلة كتير. جرّب بعد ${m
 error_suspicious_source: 🚫 المصدر ده متوقف مؤقتاً.
 error_retry_spam: ⏳ محاولات كتير. استنى شوية.
 error_retry_no_url: 🔗 ابعت لينك الفيديو تاني عشان نجرّب.
+error_youtube_disabled: |
+  ⏸ يوتيوب متوقف مؤقتاً على السيرفر (حظر IP من غوغل).
+  جرّب فيسبوك أو انستغرام أو TikTok.
+error_no_carousel: ❌ مفيش ألبوم صور في اللينك ده. جرّب /auto أو /image.
+error_instagram_restricted: |
+  🔒 المحتوى ده مقفول لجمهور معيّن على انستغرام — البوت مش مسجّل دخول ومش هيقدر يفتحه.
+  جرّب بوست عام أو انسخ اللينك من حساب عام.
+error_instagram_login: |
+  🔐 انستغرام طالب تسجيل دخول للينك ده — البوت العام مش بيستخدم كوكيز.
 error_youtube_cooldown: "⏳ يوتيوب: استنى ${seconds} ثانية قبل لينك تاني (البوت عام ومش بيستخدم حسابك)."
 error_youtube_bot: |
   ▶️ يوتيوب مش متاح دلوقتي (السيرفر أو خدمة التحميل مشغولة).

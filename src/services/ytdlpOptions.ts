@@ -8,13 +8,25 @@ import type { YtDlpFlags } from '@/services/ytdlpTypes'
 
 const maxFilesize = `${env.MAX_FILE_SIZE_MB}M`
 /** Prefer progressive HTTPS MP4 (avoid m3u8/HLS on shared hosting). */
-const progressiveVideoFormat = [
-  `best[ext=mp4][vcodec!=none][acodec!=none][protocol^=http][filesize<=${maxFilesize}]`,
-  `best[ext=mp4][protocol^=http][filesize<=${maxFilesize}][height<=720]`,
-  `bestvideo[ext=mp4][height<=720][protocol^=http]+bestaudio[ext=m4a][protocol^=http]`,
-  `best[height<=720][filesize<=${maxFilesize}]`,
-  'best',
-].join('/')
+function progressiveVideoFormat(height = 720): string {
+  const h = height
+  const hasFfmpeg = Boolean(getFfmpegPath())
+  const lines = [
+    `best[ext=mp4][vcodec!=none][acodec!=none][protocol^=http][filesize<=${maxFilesize}][height<=${h}]`,
+    `best[ext=mp4][protocol^=http][filesize<=${maxFilesize}][height<=${h}]`,
+    `best[ext=mp4][height<=${h}][filesize<=${maxFilesize}]`,
+    `best[height<=${h}][filesize<=${maxFilesize}]`,
+    'best',
+  ]
+  if (hasFfmpeg) {
+    lines.splice(
+      2,
+      0,
+      `bestvideo[ext=mp4][height<=${h}][protocol^=http]+bestaudio[ext=m4a][protocol^=http]`
+    )
+  }
+  return lines.join('/')
+}
 
 export interface DownloadFlagOverrides {
   extractorArgs?: string
@@ -74,13 +86,22 @@ function videoFormat(
       'best',
     ].join('/')
   }
-  return [
+  const hasFfmpeg = Boolean(getFfmpegPath())
+  const lines = [
     `best[ext=mp4][vcodec!=none][acodec!=none][protocol^=http][filesize<=${maxFilesize}][height<=${h}]`,
     `best[ext=mp4][protocol^=http][filesize<=${maxFilesize}][height<=${h}]`,
-    `bestvideo[ext=mp4][height<=${h}][protocol^=http]+bestaudio[ext=m4a][protocol^=http]`,
+    `best[ext=mp4][height<=${h}][filesize<=${maxFilesize}]`,
     `best[height<=${h}][filesize<=${maxFilesize}]`,
     'best',
-  ].join('/')
+  ]
+  if (hasFfmpeg) {
+    lines.splice(
+      2,
+      0,
+      `bestvideo[ext=mp4][height<=${h}][protocol^=http]+bestaudio[ext=m4a][protocol^=http]`
+    )
+  }
+  return lines.join('/')
 }
 
 let cookiesPoolReady = false

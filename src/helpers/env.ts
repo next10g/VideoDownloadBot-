@@ -80,6 +80,14 @@ const env = cleanEnv(process.env, {
     default: 15360,
     desc: 'Max video height cap (up to 16K when source provides it)',
   }),
+  YOUTUBE_DISABLED: bool({
+    default: true,
+    desc: 'Reject YouTube links with a friendly message (Hostinger IP blocks)',
+  }),
+  ALBUM_MAX_IMAGES: num({
+    default: 40,
+    desc: 'Max images in one carousel/album ZIP download',
+  }),
   SHOW_FORMAT_MENU: bool({
     default: true,
     desc: 'Show quality/type buttons before each download',

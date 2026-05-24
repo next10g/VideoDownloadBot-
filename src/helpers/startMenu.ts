@@ -34,6 +34,8 @@ export function buildStartKeyboard(ctx: Context): InlineKeyboard {
   kb.text(`🎵 ${ctx.i18n.t('mode_label_audio')}${mark('audio')}`, 'mode:audio')
   kb.text(`🖼 ${ctx.i18n.t('mode_label_image')}${mark('image')}`, 'mode:image')
   kb.row()
+  kb.text(`📸 ${ctx.i18n.t('mode_label_carousel')}${mark('carousel')}`, 'mode:carousel')
+  kb.row()
   kb.text(ctx.i18n.t('btn_menu_help'), 'menu:help')
   kb.text(ctx.i18n.t('btn_language_menu'), 'noop:language')
   kb.row()

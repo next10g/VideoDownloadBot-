@@ -28,7 +28,7 @@ export async function downloadAlbumAsZip(
 ): Promise<string> {
   const jobDir = await createJobTempDir(`alb-${jobId}`)
   const paths: string[] = []
-  const limited = urls.slice(0, 20)
+  const limited = urls.slice(0, env.ALBUM_MAX_IMAGES)
 
   for (let i = 0; i < limited.length; i++) {
     const dest = join(jobDir, `img${i + 1}.jpg`)

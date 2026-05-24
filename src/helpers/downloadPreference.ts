@@ -28,7 +28,8 @@ export async function setDownloadPreference(
   const chat = ctx.dbchat as Chat & { downloadPreference?: DownloadPreference }
   chat.downloadPreference = preference
   chat.audio = preference === 'audio'
-  chat.imagePreferred = preference === 'image'
+  chat.imagePreferred =
+    preference === 'image' || preference === 'carousel'
   await saveDbChat(ctx.dbchat)
 }
 

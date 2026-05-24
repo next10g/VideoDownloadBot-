@@ -29,6 +29,7 @@ import {
 import { isYoutubeUrl } from '@/helpers/youtubeUrl'
 import { isGenericFileUrl } from '@/helpers/isGenericFileUrl'
 import { saveDbChat } from '@/helpers/saveDbChat'
+import { ytdlpErrorI18nKey } from '@/helpers/ytdlpUserMessage'
 
 export default async function offerDownloadFormats(ctx: Context, rawUrl: string) {
   const url = normalizeUrl(rawUrl)
@@ -50,6 +51,10 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
 
   if (isBlockedUser(ctx)) {
     return ctx.reply(blockedUserMessage(ctx))
+  }
+
+  if (env.YOUTUBE_DISABLED && isYoutubeUrl(url)) {
+    return ctx.reply(ctx.i18n.t('error_youtube_disabled'))
   }
 
   if (preference === 'image') {
@@ -76,6 +81,24 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
         maxHeight: 0,
         audio: false,
       })
+    }
+
+    const wantCarousel =
+      preference === 'carousel' ||
+      (preference === 'auto' && offer.hasAlbum && offer.albumUrls.length > 0)
+
+    if (wantCarousel && offer.albumUrls.length > 0) {
+      return createDownloadJobAndRequest(ctx, jobUrl, {
+        downloadMode: DownloadMode.album,
+        maxHeight: 0,
+        audio: false,
+        albumUrls: offer.albumUrls,
+      })
+    }
+
+    if (preference === 'carousel') {
+      await editor.editMessage(ctx.i18n.t('error_no_carousel'))
+      return
     }
 
     if (preference === 'audio') {
@@ -105,6 +128,14 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
     }
 
     if (!env.SHOW_FORMAT_MENU && preference === 'auto') {
+      if (offer.hasAlbum && offer.albumUrls.length > 0) {
+        return createDownloadJobAndRequest(ctx, jobUrl, {
+          downloadMode: DownloadMode.album,
+          maxHeight: 0,
+          audio: false,
+          albumUrls: offer.albumUrls,
+        })
+      }
       const defaultHeight = offer.videoHeights[0] ?? 720
       const fbStream = offer.facebook
         ? pickFacebookStream(offer.facebook, defaultHeight)
@@ -150,6 +181,12 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
   } catch (error) {
     if (isValidationError(error)) {
       await editor.editMessage(validationMessage(ctx, error))
+      return
+    }
+    const detail = error instanceof Error ? error.message : String(error)
+    const ytdlpKey = ytdlpErrorI18nKey(detail)
+    if (ytdlpKey) {
+      await editor.editMessage(ctx.i18n.t(ytdlpKey))
       return
     }
     report(error, { ctx, location: 'offerDownloadFormats' })

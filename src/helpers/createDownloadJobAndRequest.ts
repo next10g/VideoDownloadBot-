@@ -78,6 +78,10 @@ export default async function createDownloadJobAndRequest(
     return ctx.reply(blockedUserMessage(ctx))
   }
 
+  if (env.YOUTUBE_DISABLED && isYoutubeUrl(url)) {
+    return ctx.reply(ctx.i18n.t('error_youtube_disabled'))
+  }
+
   const downloadMessageEditor = new MessageEditor(undefined, ctx)
   const statusMsg = await ctx.reply(ctx.i18n.t('status_validating'))
   downloadMessageEditor.messageId = statusMsg.message_id

@@ -34,13 +34,17 @@ export async function handleAudioMode(ctx: Context) {
   return replyModeChanged(ctx, 'audio')
 }
 
+export async function handleCarouselMode(ctx: Context) {
+  return replyModeChanged(ctx, 'carousel')
+}
+
 export async function handleModeCallback(ctx: Context) {
   const data = ctx.callbackQuery?.data
   if (!data?.startsWith('mode:')) {
     return
   }
   const pref = data.slice(5) as DownloadPreference
-  if (!['auto', 'video', 'audio', 'image'].includes(pref)) {
+  if (!['auto', 'video', 'audio', 'image', 'carousel'].includes(pref)) {
     return
   }
   await safeAnswerCallback(ctx)
