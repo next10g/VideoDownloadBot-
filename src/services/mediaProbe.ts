@@ -1,6 +1,5 @@
 import env from '@/helpers/env'
 import { isFacebookUrl } from '@/helpers/facebookUrl'
-import { isYoutubeUrl } from '@/helpers/youtubeUrl'
 import logger from '@/lib/logger'
 import { ValidationError } from '@/lib/errors'
 import {
@@ -9,6 +8,10 @@ import {
   type FacebookEmbedResult,
 } from '@/services/facebookEmbed'
 import {
+  parseFacebookLinkMeta,
+  sanitizeFacebookUrl,
+} from '@/services/facebookLinkMeta'
+import {
   facebookIdFromYtdlpError,
   resolveFacebookUrl,
 } from '@/services/resolveFacebookUrl'
@@ -16,15 +19,16 @@ import { buildProbeFlags } from '@/services/ytdlpOptions'
 import { formatYtdlpError, runYtdlpJson } from '@/services/ytdlpRunner'
 import type { YtDlpMetadata } from '@/services/ytdlpTypes'
 
+/** Facebook embed scrape budget (keep under Telegram webhook limit). */
+const FACEBOOK_PROBE_MS = 18_000
+
 export interface MediaFormatOffer {
   title: string
   description?: string
-  /** Available video heights (p), sorted high → low. Empty = no video. */
   videoHeights: number[]
   hasImage: boolean
   hasAudio: boolean
   facebook?: FacebookEmbedResult
-  /** Canonical URL for yt-dlp when share link was expanded. */
   downloadUrl?: string
 }
 
@@ -125,53 +129,58 @@ async function probeYtdlp(url: string): Promise<MediaFormatOffer> {
   return offerFromYtdlp(meta, url)
 }
 
+function isFacebookPhotoLink(url: string, downloadUrl: string): boolean {
+  if (/\/share\/p\//i.test(url)) {
+    return true
+  }
+  return parseFacebookLinkMeta(downloadUrl).kind === 'photo'
+}
+
 /** Probe link and decide which download buttons to show (no cookies). */
 export async function probeMediaOffer(url: string): Promise<MediaFormatOffer> {
-  let downloadUrl = url
   if (isFacebookUrl(url)) {
-    downloadUrl = await resolveFacebookUrl(url)
-    const embed = await probeFacebookEmbed(url, env.PIPED_API_TIMEOUT_MS)
+    const downloadUrl = sanitizeFacebookUrl(await resolveFacebookUrl(url), url)
+    const embed = await probeFacebookEmbed(url, FACEBOOK_PROBE_MS)
     if (embed && (embed.streams.length > 0 || embed.imageUrl)) {
       return offerFromFacebook(embed)
     }
-    logger.warn('facebook embed empty, trying yt-dlp probe', {
+
+    const photoLink = isFacebookPhotoLink(url, downloadUrl)
+    logger.warn('facebook embed empty', {
       url,
       resolvedUrl: downloadUrl,
+      photoLink,
     })
-  }
 
-  try {
-    return await probeYtdlp(downloadUrl)
-  } catch (error) {
-    if (!isFacebookUrl(url)) {
-      throw error
-    }
-
-    const message = formatYtdlpError(error)
-    const contentId = facebookIdFromYtdlpError(message)
-    if (contentId) {
-      const byId = await probeFacebookByContentId(
-        contentId,
-        url,
-        env.PIPED_API_TIMEOUT_MS
+    if (photoLink) {
+      throw new ValidationError(
+        'Facebook photo could not be loaded from this server (public posts only)',
+        'facebook_failed'
       )
-      if (byId) {
-        logger.info('facebook probe ok via content id', { contentId })
-        return offerFromFacebook(byId)
-      }
     }
 
-    if (downloadUrl !== url) {
-      try {
-        return await probeYtdlp(downloadUrl)
-      } catch {
-        // fall through
+    try {
+      return await probeYtdlp(downloadUrl)
+    } catch (error) {
+      const message = formatYtdlpError(error)
+      const contentId = facebookIdFromYtdlpError(message)
+      if (contentId) {
+        const byId = await probeFacebookByContentId(
+          contentId,
+          url,
+          12_000
+        )
+        if (byId) {
+          logger.info('facebook probe ok via content id', { contentId })
+          return offerFromFacebook(byId)
+        }
       }
+      throw new ValidationError(
+        'Facebook link could not be read from this server (public post/Reel only)',
+        'facebook_failed'
+      )
     }
-
-    throw new ValidationError(
-      'Facebook link could not be read from this server (public post/Reel only; private groups need login)',
-      'facebook_failed'
-    )
   }
+
+  return probeYtdlp(url)
 }

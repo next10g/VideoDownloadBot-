@@ -1,10 +1,15 @@
 import { createFetchAgent } from '@/helpers/loadUndici'
-import { isFacebookUrl } from '@/helpers/facebookUrl'
 import logger from '@/lib/logger'
-import { normalizeUrl } from '@/services/urlNormalize'
+import {
+  facebookEmbedCandidates,
+  facebookPhotoCandidates,
+  facebookVideoCandidates,
+  parseFacebookLinkMeta,
+  sanitizeFacebookUrl,
+  type FacebookContentKind,
+} from '@/services/facebookLinkMeta'
 import {
   facebookFetchHeaders,
-  facebookUrlCandidatesFromId,
   resolveFacebookUrl,
 } from '@/services/resolveFacebookUrl'
 import { downloadStreamToFile } from '@/services/youtubeStreamDownload'
@@ -22,6 +27,7 @@ export interface FacebookEmbedResult {
   description?: string
   streams: FacebookStream[]
   imageUrl?: string
+  contentKind?: FacebookContentKind
 }
 
 function unescapeJsonUrl(raw: string): string {
@@ -51,7 +57,6 @@ function parseStreamsFromHtml(html: string): FacebookStream[] {
 
   const hd =
     html.match(/"hd_src(?:_no_ratelimit)?"\s*:\s*"([^"]+)"/i)?.[1] ||
-    html.match(/hd_src&quot;:&quot;([^&]+)&quot;/i)?.[1] ||
     html.match(/"browser_native_hd_url"\s*:\s*"([^"]+)"/i)?.[1]
   if (hd) {
     streams.push({ url: unescapeJsonUrl(hd), height: 1080, label: '1080p' })
@@ -59,26 +64,19 @@ function parseStreamsFromHtml(html: string): FacebookStream[] {
 
   const sd =
     html.match(/"sd_src(?:_no_ratelimit)?"\s*:\s*"([^"]+)"/i)?.[1] ||
-    html.match(/sd_src&quot;:&quot;([^&]+)&quot;/i)?.[1] ||
     html.match(/"browser_native_sd_url"\s*:\s*"([^"]+)"/i)?.[1]
   if (sd) {
     streams.push({ url: unescapeJsonUrl(sd), height: 480, label: '480p' })
   }
 
-  const playable = html.matchAll(
+  for (const match of html.matchAll(
     /"playable_url(?:_quality_hd)?"\s*:\s*"([^"]+)"/gi
-  )
-  for (const match of playable) {
-    const url = unescapeJsonUrl(match[1])
-    streams.push({ url, height: 360, label: '360p' })
-  }
-
-  const dash = html.matchAll(/"base_url"\s*:\s*"([^"]+)"/gi)
-  for (const match of dash) {
-    const url = unescapeJsonUrl(match[1])
-    if (url.includes('video') || url.includes('.mp4')) {
-      streams.push({ url, height: 720, label: '720p' })
-    }
+  )) {
+    streams.push({
+      url: unescapeJsonUrl(match[1]),
+      height: 360,
+      label: '360p',
+    })
   }
 
   const ogVideo = html.match(
@@ -91,22 +89,69 @@ function parseStreamsFromHtml(html: string): FacebookStream[] {
   return uniqueStreams(streams)
 }
 
+function scoreImageUrl(url: string): number {
+  let score = url.length
+  if (/s\d+x\d+/i.test(url)) {
+    score -= 5000
+  }
+  if (/p\d+x\d+/i.test(url)) {
+    score -= 3000
+  }
+  if (/emoji|safe_image|static\.xx/i.test(url)) {
+    score -= 10000
+  }
+  if (/stp=cmp|_nc_cat/i.test(url)) {
+    score += 500
+  }
+  return score
+}
+
+function parseImagesFromHtml(html: string): string[] {
+  const urls = new Set<string>()
+
+  const push = (raw?: string) => {
+    if (!raw?.startsWith('http')) {
+      return
+    }
+    const url = unescapeJsonUrl(raw)
+    if (
+      url.includes('scontent') &&
+      /\.(jpg|jpeg|png|webp)/i.test(url) &&
+      !url.includes('emoji')
+    ) {
+      urls.add(url)
+    }
+  }
+
+  push(
+    html.match(/property=["']og:image["']\s+content=["']([^"']+)["']/i)?.[1]
+  )
+
+  for (const match of html.matchAll(
+    /"(?:uri|url|src|image_url|full_size_image)"\s*:\s*"([^"]+)"/gi
+  )) {
+    const url = unescapeJsonUrl(match[1])
+    if (url.includes('scontent')) {
+      push(url)
+    }
+  }
+
+  for (const match of html.matchAll(
+    /https:\\\/\\\/scontent[^"\\]+/gi
+  )) {
+    push(match[0])
+  }
+  for (const match of html.matchAll(
+    /https:\/\/scontent[^"'\s\\]+/gi
+  )) {
+    push(match[0])
+  }
+
+  return [...urls].sort((a, b) => scoreImageUrl(b) - scoreImageUrl(a))
+}
+
 function parseImageFromHtml(html: string): string | undefined {
-  const ogImage = html.match(
-    /property=["']og:image["']\s+content=["']([^"']+)["']/i
-  )?.[1]
-  if (ogImage?.startsWith('http') && !ogImage.includes('emoji')) {
-    return ogImage
-  }
-
-  const scontent = html.match(
-    /https:\/\/scontent[^"'\s]+?\.(?:jpg|jpeg|png|webp)(?:\?[^"'\s]*)?/i
-  )?.[0]
-  if (scontent && !scontent.includes('emoji')) {
-    return unescapeJsonUrl(scontent)
-  }
-
-  return undefined
+  return parseImagesFromHtml(html)[0]
 }
 
 function parseTitleFromHtml(html: string): string | undefined {
@@ -126,13 +171,18 @@ function mergeResult(
   base: FacebookEmbedResult | null,
   patch: Partial<FacebookEmbedResult>
 ): FacebookEmbedResult {
+  const imageUrl =
+    patch.imageUrl && scoreImageUrl(patch.imageUrl) >= scoreImageUrl(base?.imageUrl || '')
+      ? patch.imageUrl
+      : base?.imageUrl || patch.imageUrl
   return {
     pageUrl: patch.pageUrl || base?.pageUrl || '',
     resolvedUrl: patch.resolvedUrl || base?.resolvedUrl,
     title: patch.title || base?.title,
     description: patch.description || base?.description,
     streams: uniqueStreams([...(base?.streams || []), ...(patch.streams || [])]),
-    imageUrl: patch.imageUrl || base?.imageUrl,
+    imageUrl,
+    contentKind: patch.contentKind || base?.contentKind,
   }
 }
 
@@ -156,117 +206,46 @@ async function fetchHtml(url: string, timeoutMs: number): Promise<string> {
   }
 }
 
-async function probeOembedJson(
-  rawUrl: string,
-  timeoutMs: number
-): Promise<FacebookEmbedResult | null> {
-  const endpoints = [
-    'https://www.facebook.com/plugins/post/oembed.json',
-    'https://www.facebook.com/plugins/video/oembed.json',
-  ]
-  for (const base of endpoints) {
-    try {
-      const url = `${base}/?url=${encodeURIComponent(rawUrl)}&format=json`
-      const body = await fetchHtml(url, timeoutMs)
-      const data = JSON.parse(body) as {
-        title?: string
-        author_name?: string
-        html?: string
-        url?: string
-      }
-      if (!data.html) {
-        continue
-      }
-      const streams = parseStreamsFromHtml(data.html)
-      const imageUrl = parseImageFromHtml(data.html)
-      if (streams.length === 0 && !imageUrl) {
-        continue
-      }
-      return {
-        pageUrl: rawUrl,
-        resolvedUrl: data.url ? normalizeUrl(data.url) : undefined,
-        title: data.title || data.author_name,
-        streams,
-        imageUrl,
-      }
-    } catch (error) {
-      logger.warn('facebook oembed failed', {
-        base,
-        detail: error instanceof Error ? error.message : String(error),
-      })
-    }
-  }
-  return null
+function pluginPostUrl(href: string): string {
+  return `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(href)}&show_text=true&width=640`
 }
 
-function buildEmbedTargets(rawUrl: string, resolvedUrl: string): string[] {
-  const targets: string[] = [
-    `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(rawUrl)}&show_text=false&width=1280`,
-  ]
-  if (resolvedUrl !== rawUrl) {
+function pluginVideoUrl(href: string): string {
+  return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(href)}&show_text=false&width=1280`
+}
+
+function htmlTargetsForHref(href: string, kind: FacebookContentKind): string[] {
+  const targets = [pluginPostUrl(href), pluginVideoUrl(href)]
+  try {
+    const u = new URL(href)
     targets.push(
-      `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(resolvedUrl)}&show_text=false&width=1280`
+      `https://m.facebook.com${u.pathname}${u.search}`,
+      href.replace('www.facebook.com', 'mbasic.facebook.com')
     )
+  } catch {
+    targets.push(href)
   }
-
-  if (!/\/share\//i.test(resolvedUrl)) {
-    try {
-      const parsed = new URL(resolvedUrl)
-      targets.push(
-        `https://m.facebook.com${parsed.pathname}${parsed.search}`,
-        resolvedUrl.replace('www.facebook.com', 'mbasic.facebook.com'),
-        resolvedUrl
-      )
-    } catch {
-      targets.push(resolvedUrl)
-    }
+  if (kind === 'photo') {
+    return [pluginPostUrl(href), ...targets.filter((t) => !t.includes('video.php'))]
   }
-
-  return [...new Set(targets)]
+  return targets
 }
 
-/** Cookie-less Facebook: oEmbed + embed plugin + mobile HTML parsing. */
-export async function probeFacebookEmbed(
-  rawUrl: string,
-  timeoutMs = 30_000
+async function scrapeTargets(
+  targets: string[],
+  perTargetMs: number,
+  pageUrl: string,
+  resolvedUrl: string,
+  kind: FacebookContentKind
 ): Promise<FacebookEmbedResult | null> {
-  const resolvedUrl = await resolveFacebookUrl(rawUrl)
   let best: FacebookEmbedResult | null = null
-
-  const oembed = await probeOembedJson(rawUrl, timeoutMs)
-  if (oembed) {
-    best = mergeResult(best, { ...oembed, pageUrl: rawUrl, resolvedUrl })
-    if (best.streams.length > 0) {
-      logger.info('facebook oembed probe ok', {
-        streams: best.streams.length,
-        resolvedUrl,
-      })
-      return best
-    }
-  }
-
-  if (resolvedUrl !== rawUrl) {
-    const oembedResolved = await probeOembedJson(resolvedUrl, timeoutMs)
-    if (oembedResolved) {
-      best = mergeResult(best, {
-        ...oembedResolved,
-        pageUrl: rawUrl,
-        resolvedUrl,
-      })
-      if (best.streams.length > 0) {
-        logger.info('facebook oembed probe ok (resolved)', { resolvedUrl })
-        return best
-      }
-    }
-  }
-
-  const targets = buildEmbedTargets(rawUrl, resolvedUrl)
 
   for (const target of targets) {
     try {
-      const html = await fetchHtml(target, timeoutMs)
+      const html = await fetchHtml(target, perTargetMs)
       const streams = parseStreamsFromHtml(html)
-      const imageUrl = parseImageFromHtml(html)
+      const images = parseImagesFromHtml(html)
+      const imageUrl = images[0]
       const title = parseTitleFromHtml(html)
       const description = parseDescriptionFromHtml(html)
 
@@ -275,40 +254,121 @@ export async function probeFacebookEmbed(
       }
 
       const patch: FacebookEmbedResult = {
-        pageUrl: rawUrl,
+        pageUrl,
         resolvedUrl,
         title,
         description,
         streams,
         imageUrl,
+        contentKind: kind,
       }
       best = mergeResult(best, patch)
 
       if (streams.length > 0) {
         logger.info('facebook embed probe ok', {
-          target,
+          target: target.slice(0, 120),
           streams: streams.length,
-          heights: streams.map((s) => s.height),
+          kind,
+        })
+        return best
+      }
+
+      if (imageUrl && kind === 'photo') {
+        logger.info('facebook photo probe ok', {
+          target: target.slice(0, 120),
           resolvedUrl,
         })
         return best
       }
     } catch (error) {
       logger.warn('facebook embed fetch failed', {
-        target,
+        target: target.slice(0, 120),
         detail: error instanceof Error ? error.message : String(error),
       })
     }
   }
 
-  if (best?.imageUrl || (best && best.streams.length > 0)) {
-    logger.info('facebook embed partial', {
-      pageUrl: rawUrl,
-      resolvedUrl,
-      streams: best.streams.length,
-      hasImage: Boolean(best.imageUrl),
-    })
+  if (best?.imageUrl) {
+    logger.info('facebook embed partial (image)', { resolvedUrl, kind })
     return best
+  }
+
+  return null
+}
+
+async function probePhotoPaths(
+  rawUrl: string,
+  resolvedUrl: string,
+  perTargetMs: number
+): Promise<FacebookEmbedResult | null> {
+  const photoHrefs = facebookPhotoCandidates(rawUrl, resolvedUrl)
+  const hrefs =
+    photoHrefs.length > 0
+      ? photoHrefs
+      : facebookEmbedCandidates(rawUrl, resolvedUrl)
+  const targets: string[] = []
+  for (const href of hrefs.slice(0, 4)) {
+    targets.push(...htmlTargetsForHref(href, 'photo'))
+  }
+  return scrapeTargets(
+    [...new Set(targets)].slice(0, 10),
+    perTargetMs,
+    rawUrl,
+    resolvedUrl,
+    'photo'
+  )
+}
+
+async function probeVideoPaths(
+  rawUrl: string,
+  resolvedUrl: string,
+  perTargetMs: number
+): Promise<FacebookEmbedResult | null> {
+  const hrefs = facebookVideoCandidates(rawUrl, resolvedUrl)
+  const targets: string[] = []
+  for (const href of hrefs.slice(0, 3)) {
+    targets.push(pluginVideoUrl(href))
+    targets.push(...htmlTargetsForHref(href, 'video').filter((t) => t.includes('video.php')))
+  }
+  return scrapeTargets(
+    [...new Set(targets)].slice(0, 8),
+    perTargetMs,
+    rawUrl,
+    resolvedUrl,
+    'video'
+  )
+}
+
+/** Cookie-less Facebook: post/video plugins only (no oEmbed, no yt-dlp). */
+export async function probeFacebookEmbed(
+  rawUrl: string,
+  timeoutMs = 20_000
+): Promise<FacebookEmbedResult | null> {
+  const resolvedRaw = await resolveFacebookUrl(rawUrl)
+  const resolvedUrl = sanitizeFacebookUrl(resolvedRaw, rawUrl)
+  const meta = parseFacebookLinkMeta(resolvedUrl)
+  const perTargetMs = Math.min(7_000, Math.max(4_000, Math.floor(timeoutMs / 3)))
+
+  const tryPhotoFirst =
+    meta.kind === 'photo' ||
+    /\/share\/p\//i.test(rawUrl) ||
+    resolvedUrl.includes('photo.php') ||
+    resolvedUrl.includes('story.php')
+
+  if (tryPhotoFirst) {
+    const photo = await probePhotoPaths(rawUrl, resolvedUrl, perTargetMs)
+    if (photo) {
+      return photo
+    }
+  }
+
+  const video = await probeVideoPaths(rawUrl, resolvedUrl, perTargetMs)
+  if (video) {
+    return video
+  }
+
+  if (!tryPhotoFirst) {
+    return probePhotoPaths(rawUrl, resolvedUrl, perTargetMs)
   }
 
   return null
@@ -339,21 +399,28 @@ export async function downloadFacebookDirect(
   )
 }
 
-export function facebookPageUrl(url: string): string {
-  return isFacebookUrl(url) ? normalizeUrl(url) : url
-}
-
-/** Re-probe a permalink built from yt-dlp numeric id (share links). */
+/** Fast retry when yt-dlp returns a numeric id (no full re-resolve). */
 export async function probeFacebookByContentId(
   contentId: string,
   rawUrl: string,
   timeoutMs: number
 ): Promise<FacebookEmbedResult | null> {
-  for (const candidate of facebookUrlCandidatesFromId(contentId)) {
-    const result = await probeFacebookEmbed(candidate, timeoutMs)
-    if (result && (result.streams.length > 0 || result.imageUrl)) {
-      return { ...result, pageUrl: rawUrl, resolvedUrl: candidate }
-    }
+  const perTargetMs = Math.min(6_000, Math.floor(timeoutMs / 2))
+  const photoResolved = sanitizeFacebookUrl(
+    `https://www.facebook.com/photo.php?fbid=${contentId}`,
+    rawUrl
+  )
+
+  const photo = await probePhotoPaths(rawUrl, photoResolved, perTargetMs)
+  if (photo) {
+    return { ...photo, pageUrl: rawUrl, resolvedUrl: photoResolved }
   }
+
+  const reelResolved = `https://www.facebook.com/reel/${contentId}`
+  const video = await probeVideoPaths(rawUrl, reelResolved, perTargetMs)
+  if (video) {
+    return { ...video, pageUrl: rawUrl, resolvedUrl: reelResolved }
+  }
+
   return null
 }

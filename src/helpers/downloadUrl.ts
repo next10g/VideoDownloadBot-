@@ -26,6 +26,7 @@ import {
   pickFacebookStream,
   probeFacebookEmbed,
 } from '@/services/facebookEmbed'
+import { sanitizeFacebookUrl } from '@/services/facebookLinkMeta'
 import { resolveFacebookUrl } from '@/services/resolveFacebookUrl'
 import { buildDownloadFlags } from '@/services/ytdlpOptions'
 import { runYoutubeDownload } from '@/services/youtubeDownload'
@@ -240,7 +241,10 @@ export default async function downloadUrl(
             )
           : await runYtdlpDownload(
               isFacebookUrl(downloadJob.url)
-                ? await resolveFacebookUrl(downloadJob.url)
+                ? sanitizeFacebookUrl(
+                    await resolveFacebookUrl(downloadJob.url),
+                    downloadJob.url
+                  )
                 : downloadJob.url,
               buildDownloadFlags(outputBase, downloadJob.audio, flagOpts),
               env.DOWNLOAD_TIMEOUT_MS,

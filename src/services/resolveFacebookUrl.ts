@@ -1,6 +1,7 @@
 import { createFetchAgent } from '@/helpers/loadUndici'
 import logger from '@/lib/logger'
 import { isFacebookUrl } from '@/helpers/facebookUrl'
+import { sanitizeFacebookUrl } from '@/services/facebookLinkMeta'
 import { normalizeUrl } from '@/services/urlNormalize'
 
 const DESKTOP_UA =
@@ -57,9 +58,10 @@ function permalinkFromIds(ids: {
     out.push(`https://www.facebook.com/photo.php?fbid=${ids.photoId}`)
     out.push(`https://www.facebook.com/photo/?fbid=${ids.photoId}`)
   }
-  if (ids.storyFbid && ids.postId) {
+  const ownerId = ids.postId
+  if (ids.storyFbid && ownerId) {
     out.push(
-      `https://www.facebook.com/story.php?story_fbid=${ids.storyFbid}&id=${ids.postId}`
+      `https://www.facebook.com/story.php?story_fbid=${ids.storyFbid}&id=${ownerId}`
     )
   }
   if (ids.groupId && ids.postId) {
@@ -254,7 +256,7 @@ export async function resolveFacebookUrl(url: string): Promise<string> {
 
   const normalized = normalizeUrl(url)
   if (isUsableFacebookUrl(normalized) && !/\/share\//i.test(normalized)) {
-    return normalized
+    return sanitizeFacebookUrl(normalized, url)
   }
 
   const needsResolve =
@@ -296,8 +298,9 @@ export async function resolveFacebookUrl(url: string): Promise<string> {
     try {
       const resolved = await run()
       if (resolved && isUsableFacebookUrl(resolved)) {
-        logger.info('facebook url resolved', { from: url, to: resolved })
-        return resolved
+        const clean = sanitizeFacebookUrl(resolved, url)
+        logger.info('facebook url resolved', { from: url, to: clean })
+        return clean
       }
     } catch (error) {
       logger.warn('facebook url resolve strategy failed', {

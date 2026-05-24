@@ -121,6 +121,8 @@ async function runApp() {
   const webhookPath = `/webhook/${env.WEBHOOK_SECRET}`
   const webhookHandler = webhookCallback(bot, 'http', {
     secretToken: env.WEBHOOK_SECRET,
+    /** Facebook photo probe can take 15–20s; default 10s caused unhandledRejection. */
+    timeoutMilliseconds: 55_000,
   })
 
   httpServer = createServer(async (req, res) => {
