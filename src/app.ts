@@ -57,6 +57,7 @@ import { isBenignTelegramError } from '@/helpers/telegramErrors'
 import { resolveFfmpegPath } from '@/services/ffmpegPath'
 import { initYoutubeFetchAgent } from '@/services/youtubeFetchInit'
 import { logYoutubePublicMode } from '@/services/youtubeDownload'
+import { logCobaltMode } from '@/services/cobaltDownload'
 import { initYtdlpOptions } from '@/services/ytdlpOptions'
 import startMongo from '@/helpers/startMongo'
 import { startTempMaintenance } from '@/helpers/tempMaintenance'
@@ -103,6 +104,7 @@ async function runApp() {
   await initYtdlpOptions()
   initYoutubeFetchAgent()
   logYoutubePublicMode()
+  logCobaltMode()
   await cleanupDownloadJobs()
   tempMaintenanceTimer = startTempMaintenance()
 

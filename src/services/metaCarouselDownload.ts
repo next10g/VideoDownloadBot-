@@ -13,6 +13,10 @@ import {
   downloadYtdlpInstagramCarousel,
   probeYtdlpInstagramCarousel,
 } from '@/services/instagramYtdlpCarousel'
+import {
+  cobaltEnabled,
+  downloadCarouselViaCobalt,
+} from '@/services/cobaltDownload'
 
 const FB_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
@@ -188,6 +192,13 @@ export async function downloadMetaCarousel(
   let imageUrls = await probeMetaCarouselUrls(url)
   const useIg = isInstagramUrl(url)
 
+  if (useIg && cobaltEnabled()) {
+    const fromCobalt = await downloadCarouselViaCobalt(url, jobDir)
+    if (fromCobalt.length > 1) {
+      return fromCobalt
+    }
+  }
+
   if (useIg && imageUrls.length <= 1) {
     try {
       const { probeInstagramEmbed } = await import('@/services/instagramEmbedMedia')
@@ -241,6 +252,11 @@ export async function downloadMetaCarousel(
   }
 
   if (useIg && !isInstagramReelUrl(url)) {
+    const fromGalleryEarly = await tryGalleryDlDownload(url, jobDir)
+    if (fromGalleryEarly.length > 1) {
+      return fromGalleryEarly
+    }
+
     const ytdlpPaths = await downloadYtdlpInstagramCarousel(url, jobDir)
     if (ytdlpPaths.length > 1) {
       const { prepareTelegramPhoto } = await import('@/helpers/prepareTelegramPhoto')

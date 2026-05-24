@@ -11,6 +11,10 @@ import {
 } from '@/services/instagramEmbedMedia'
 import { fetchInstagramVideoToFile } from '@/helpers/instagramCdnVideoFetch'
 import { resolveInstagramVideoViaApi } from '@/services/instagramPublicMedia'
+import {
+  cobaltEnabled,
+  downloadVideoViaCobalt,
+} from '@/services/cobaltDownload'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
 
@@ -81,6 +85,36 @@ async function downloadResolvedVideo(
   return { filePath: dest, info: { title: 'Instagram', ext: 'mp4' } }
 }
 
+async function tryCobaltVideo(
+  url: string,
+  jobDir: string
+): Promise<{ filePath: string; info?: YtDlpMetadata } | undefined> {
+  if (!cobaltEnabled()) {
+    return undefined
+  }
+  try {
+    const dest = join(jobDir, 'video.mp4')
+    await downloadVideoViaCobalt(url, dest)
+    const { stat: fsStat } = await import('fs/promises')
+    const size = (await fsStat(dest)).size
+    if (size < 80_000 && /\/(reel|tv)\//i.test(url)) {
+      throw new Error('Cobalt video too small')
+    }
+    logger.info('instagram video download ok', {
+      url,
+      bytes: size,
+      attempt: 'cobalt',
+    })
+    return { filePath: dest, info: { title: 'Instagram', ext: 'mp4' } }
+  } catch (error) {
+    logger.warn('instagram cobalt failed', {
+      url,
+      detail: error instanceof Error ? error.message : String(error),
+    })
+    return undefined
+  }
+}
+
 async function tryEmbedVideoFirst(
   url: string,
   jobDir: string
@@ -134,6 +168,11 @@ export async function runInstagramVideoDownload(
   audio: boolean,
   maxHeight: number
 ): Promise<{ filePath: string; info?: YtDlpMetadata; stderr: string }> {
+  const cobaltFirst = await tryCobaltVideo(url, jobDir)
+  if (cobaltFirst) {
+    return { ...cobaltFirst, stderr: '' }
+  }
+
   const embedFirst = await tryEmbedVideoFirst(url, jobDir)
   if (embedFirst) {
     return { ...embedFirst, stderr: '' }
@@ -220,6 +259,11 @@ export async function runInstagramVideoDownload(
   }
 
   if (isInstagramYtdlpBlocked(lastStderr)) {
+    const cobaltRetry = await tryCobaltVideo(url, jobDir)
+    if (cobaltRetry) {
+      return { ...cobaltRetry, stderr: '' }
+    }
+
     try {
       const videoUrl =
         (await probeInstagramEmbed(url)).videoUrl ||

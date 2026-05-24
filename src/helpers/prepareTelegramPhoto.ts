@@ -1,5 +1,5 @@
 import { execFile } from 'child_process'
-import { stat } from 'fs/promises'
+import { copyFile, stat } from 'fs/promises'
 import { join } from 'path'
 import { promisify } from 'util'
 import { loadSharp } from '@/helpers/sharpLoader'
@@ -11,6 +11,14 @@ const execFileAsync = promisify(execFile)
 /** Telegram photo limit is 10 MB; stay under 9 MB after re-encode. */
 const TELEGRAM_PHOTO_MAX_BYTES = 9 * 1024 * 1024
 const TELEGRAM_MAX_DIMENSION = 4096
+
+function isTelegramReadyImage(path: string, size: number): boolean {
+  return (
+    /\.(jpe?g|png)$/i.test(path) &&
+    size >= 256 &&
+    size <= TELEGRAM_PHOTO_MAX_BYTES
+  )
+}
 
 async function convertWithFfmpeg(
   inputPath: string,
@@ -49,6 +57,10 @@ export async function prepareTelegramPhoto(
     throw new Error('image too small')
   }
 
+  if (isTelegramReadyImage(inputPath, inputStat.size)) {
+    return inputPath
+  }
+
   const outputPath = join(
     jobDir || inputPath.replace(/[^/\\]+$/, ''),
     `tg-${inputPath.replace(/^.*[/\\]/, '').replace(/\.\w+$/, '')}.jpg`
@@ -85,9 +97,33 @@ export async function prepareTelegramPhoto(
   try {
     return await convertWithFfmpeg(inputPath, outputPath)
   } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    if (/\.webp$/i.test(inputPath)) {
+      throw error
+    }
+    if (isTelegramReadyImage(inputPath, inputStat.size)) {
+      logger.warn('prepareTelegramPhoto using original file', {
+        path: inputPath,
+        detail,
+      })
+      return inputPath
+    }
+    if (!getFfmpegPath() && inputStat.size <= TELEGRAM_PHOTO_MAX_BYTES) {
+      const fallback = join(
+        jobDir || inputPath.replace(/[^/\\]+$/, ''),
+        inputPath.replace(/^.*[/\\]/, '')
+      )
+      if (fallback !== inputPath) {
+        await copyFile(inputPath, fallback)
+      }
+      logger.warn('prepareTelegramPhoto passthrough (no ffmpeg/sharp)', {
+        path: inputPath,
+      })
+      return fallback !== inputPath ? fallback : inputPath
+    }
     logger.warn('prepareTelegramPhoto ffmpeg failed', {
       path: inputPath,
-      detail: error instanceof Error ? error.message : String(error),
+      detail,
     })
     throw error
   }

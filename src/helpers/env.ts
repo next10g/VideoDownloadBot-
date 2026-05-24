@@ -104,6 +104,22 @@ const env = cleanEnv(process.env, {
     default: true,
     desc: 'When yt-dlp is blocked, use Instagram embed for video + carousel',
   }),
+  COBALT_ENABLED: bool({
+    default: true,
+    desc: 'Use Cobalt API mirrors for IG/TikTok/etc when yt-dlp/CDN fail (no cookies)',
+  }),
+  COBALT_API_URLS: commaList({
+    default: [],
+    desc: 'Cobalt API bases (comma-separated). Empty = built-in public mirrors',
+  }),
+  COBALT_API_KEY: str({
+    default: '',
+    desc: 'Optional Api-Key for private Cobalt instances',
+  }),
+  COBALT_TIMEOUT_MS: num({
+    default: 45_000,
+    desc: 'Timeout per Cobalt API request',
+  }),
   SHOW_FORMAT_MENU: bool({
     default: true,
     desc: 'Show quality/type buttons before each download',

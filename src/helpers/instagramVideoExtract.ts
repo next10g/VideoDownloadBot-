@@ -6,18 +6,47 @@ export interface InstagramVideoCandidate {
   source: string
 }
 
+const MIN_VIDEO_WIDTH = 144
+const MAX_VIDEO_WIDTH = 1920
+
 const VIDEO_BLOCK_RE =
   /"video_versions"\s*:\s*(\[[\s\S]*?\])\s*,\s*"(?:has_audio|video_duration|is_video)"/g
+
+export function isLikelyInstagramVideoUrl(url: string): boolean {
+  const path = url.split('?')[0].toLowerCase()
+  if (/\.(jpe?g|png|webp|gif|heic)$/.test(path)) {
+    return false
+  }
+  if (/\.(mp4|m3u8)(\?|$)/.test(path)) {
+    return true
+  }
+  if (!/cdninstagram|fbcdn/i.test(url)) {
+    return false
+  }
+  return (
+    /\/v\/t\d+/i.test(url) ||
+    /video/i.test(url) ||
+    /e15=/.test(url) ||
+    /\.mp4/i.test(url)
+  )
+}
+
+function isSaneVideoWidth(width: number): boolean {
+  return width >= MIN_VIDEO_WIDTH && width <= MAX_VIDEO_WIDTH
+}
 
 function parseVideoVersionsBlock(block: string): InstagramVideoCandidate[] {
   const out: InstagramVideoCandidate[] = []
   const re =
-    /"width"\s*:\s*(\d+)[\s\S]*?"url"\s*:\s*"((?:https?:\\\/\\\/|https?:\/\/)[^"]+)"/g
+    /"width"\s*:\s*(\d+)[\s\S]{0,400}?"url"\s*:\s*"((?:https?:\\\/\\\/|https?:\/\/)[^"]+)"/g
   let match: RegExpExecArray | null
   while ((match = re.exec(block))) {
     const width = Number(match[1] || 0)
     const url = decodeJsonUrl(match[2] || '')
-    if (url.startsWith('http') && /cdninstagram|fbcdn/i.test(url)) {
+    if (
+      isSaneVideoWidth(width) &&
+      isLikelyInstagramVideoUrl(url)
+    ) {
       out.push({ url, width, source: 'video_versions' })
     }
   }
@@ -34,7 +63,7 @@ function extractOgVideo(html: string): InstagramVideoCandidate[] {
     let match: RegExpExecArray | null
     while ((match = pattern.exec(html))) {
       const url = decodeJsonUrl(match[1] || '')
-      if (url.startsWith('http')) {
+      if (url.startsWith('http') && isLikelyInstagramVideoUrl(url)) {
         out.push({ url, width: 720, source: 'og:video' })
       }
     }
@@ -55,11 +84,8 @@ function extractLooseVideoUrls(html: string): InstagramVideoCandidate[] {
     let match: RegExpExecArray | null
     while ((match = re.exec(html))) {
       const url = decodeJsonUrl(match[1] || '')
-      if (
-        url.startsWith('http') &&
-        (/cdninstagram|fbcdn/i.test(url) || /\.(mp4|m3u8)/i.test(url.split('?')[0]))
-      ) {
-        out.push({ url, width: 640, source: 'json_field' })
+      if (url.startsWith('http') && isLikelyInstagramVideoUrl(url)) {
+        out.push({ url, width: 720, source: 'json_field' })
       }
     }
   }
@@ -73,36 +99,41 @@ export function extractInstagramVideoCandidates(html: string): InstagramVideoCan
   }
 
   const all: InstagramVideoCandidate[] = []
+  all.push(...extractOgVideo(html))
+
   let blockMatch: RegExpExecArray | null
   const blockRe = new RegExp(VIDEO_BLOCK_RE.source, 'g')
   while ((blockMatch = blockRe.exec(html))) {
     all.push(...parseVideoVersionsBlock(blockMatch[1] || ''))
   }
-  all.push(...extractOgVideo(html))
+
   all.push(...extractLooseVideoUrls(html))
 
   const byUrl = new Map<string, InstagramVideoCandidate>()
   for (const c of all) {
-    if (/\.(jpe?g|png|webp)(\?|$)/i.test(c.url.split('?')[0])) {
-      continue
-    }
     const prev = byUrl.get(c.url)
     if (!prev || c.width > prev.width) {
       byUrl.set(c.url, c)
     }
   }
 
-  return [...byUrl.values()].sort((a, b) => b.width - a.width)
+  return [...byUrl.values()]
+    .filter((c) => isLikelyInstagramVideoUrl(c.url))
+    .sort((a, b) => b.width - a.width)
 }
 
 export function pickBestInstagramVideo(
   candidates: InstagramVideoCandidate[]
 ): InstagramVideoCandidate | undefined {
-  const mp4 = candidates.filter((c) => !/\.m3u8/i.test(c.url))
+  const sane = candidates.filter(
+    (c) => isSaneVideoWidth(c.width) || c.source === 'og:video'
+  )
+  const pool = sane.length > 0 ? sane : candidates
+  const mp4 = pool.filter((c) => !/\.m3u8/i.test(c.url))
   if (mp4.length > 0) {
     return mp4[0]
   }
-  return candidates[0]
+  return pool[0]
 }
 
 export function extractInstagramLsdToken(html: string): string | undefined {

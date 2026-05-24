@@ -54,10 +54,11 @@ function scoreEmbedHtml(html: string, postUrl: string): number {
     return 0
   }
   if (isInstagramReelUrl(postUrl)) {
-    const videos = extractInstagramVideoCandidates(html)
-    if (videos.length > 0) {
-      return 1000 + videos[0].width
+    const best = extractInstagramVideoCandidates(html)[0]
+    if (best) {
+      return 500 + best.width
     }
+    return 0
   }
   return dedupeByAssetId(extractDisplayUrls(html)).length
 }
@@ -84,9 +85,11 @@ export async function fetchBestInstagramEmbedHtml(
   }
 
   if (bestCount > 0) {
+    const reel = isInstagramReelUrl(postUrl)
     logger.info('instagram embed fetch', {
       url: postUrl,
-      slides: bestCount,
+      slides: reel ? undefined : bestCount,
+      videoScore: reel ? bestCount : undefined,
       htmlLen: bestHtml.length,
       ua: bestUa.includes('Instagram') ? 'ig-app' : bestUa.includes('iPhone') ? 'iphone' : 'other',
     })
