@@ -15,6 +15,7 @@ export type ValidationErrorCode =
   | 'facebook_failed'
   | 'instagram_restricted'
   | 'instagram_login'
+  | 'instagram_private'
 
 export class ValidationError extends Error {
   constructor(

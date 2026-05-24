@@ -1,4 +1,3 @@
-import { createWriteStream } from 'fs'
 import { readFile, readdir, stat } from 'fs/promises'
 import { join } from 'path'
 import { DocumentType } from '@typegoose/typegoose'
@@ -39,7 +38,6 @@ import {
   isYoutubeCookiesInvalid,
 } from '@/services/ytdlpCookies'
 import { validateMetadata } from '@/services/ytdlpProbe'
-import { downloadAlbumAsZip } from '@/helpers/downloadAlbumZip'
 import { isInstagramUrl } from '@/helpers/instagramUrl'
 import { recordUserDownload } from '@/helpers/userDownloadStats'
 import { saveUserLink } from '@/helpers/userLibrary'
@@ -50,8 +48,9 @@ import {
   isSocialCarouselUrl,
   probeSocialImageUrls,
 } from '@/helpers/socialCarousel'
-import { extractAlbumImageUrls } from '@/services/albumExtract'
-import { pipeZipArchive } from '@/helpers/createZipArchive'
+import { downloadImagesToDir } from '@/helpers/downloadSocialImages'
+import { sendPhotoAlbum } from '@/helpers/sendPhotoAlbum'
+import { collectImageUrlsFromInfo } from '@/helpers/extractImageUrlsFromInfo'
 
 function escapeTitle(title: string | undefined): string {
   return (title || '').replace('<', '&lt;').replace('>', '&gt;')
@@ -119,32 +118,41 @@ async function assertFileWithinLimits(filePath: string): Promise<number> {
 
 const IMAGE_ONLY_FORMAT = SOCIAL_IMAGE_FORMAT
 
+type ImageDelivery =
+  | { kind: 'single'; path: string }
+  | { kind: 'album'; paths: string[] }
+
 async function resolveFromInfoJsonOnly(
   info: YtDlpMetadata,
   jobDir: string,
-  jobId: string,
+  pageUrl: string,
   isSocial: boolean
-): Promise<string | undefined> {
-  const albumUrls = extractAlbumImageUrls(info)
-  if (isSocial && albumUrls.length > 0) {
-    if (albumUrls.length > 1) {
-      return downloadAlbumAsZip(albumUrls, jobId)
-    }
+): Promise<ImageDelivery | undefined> {
+  const urls = await collectImageUrlsFromInfo(info, pageUrl)
+  if (isSocial && urls.length > 1) {
+    return { kind: 'album', paths: await downloadImagesToDir(urls, jobDir) }
+  }
+  if (isSocial && urls.length === 1) {
     const dest = join(jobDir, 'video.jpg')
-    await fetchImageToFile(albumUrls[0], dest)
-    return dest
+    await fetchImageToFile(urls[0], dest)
+    return { kind: 'single', path: dest }
   }
   if (info.entries?.length && info.entries.length > 1) {
-    return downloadCarouselEntriesFromInfo(info, jobDir, jobId)
+    const entryPaths = await downloadCarouselEntriesFromInfo(info, jobDir)
+    if (entryPaths.length > 1) {
+      return { kind: 'album', paths: entryPaths }
+    }
+    if (entryPaths.length === 1) {
+      return { kind: 'single', path: entryPaths[0] }
+    }
   }
   return undefined
 }
 
 async function downloadCarouselEntriesFromInfo(
   info: YtDlpMetadata,
-  jobDir: string,
-  jobId: string
-): Promise<string | undefined> {
+  jobDir: string
+): Promise<string[]> {
   const entries = info.entries || []
   const urls = entries
     .map((entry) => {
@@ -154,40 +162,50 @@ async function downloadCarouselEntriesFromInfo(
     .filter(Boolean)
     .slice(0, env.ALBUM_MAX_IMAGES)
 
-  if (urls.length === 0) {
+  const paths: string[] = []
+  for (let i = 0; i < urls.length; i++) {
+    const entryOutput = join(jobDir, `entry-${i}`)
+    try {
+      await runYtdlpDownload(
+        urls[i],
+        {
+          ...buildDownloadFlags(entryOutput, false, {
+            imageMode: true,
+            sourceUrl: urls[i],
+          }),
+          format: SOCIAL_IMAGE_FORMAT,
+          writeInfoJson: false,
+        },
+        env.DOWNLOAD_TIMEOUT_MS,
+        `entry-${i + 1}`
+      )
+      paths.push(await resolveDownloadedMediaPath(jobDir, `entry-${i}`, true))
+    } catch {
+      // skip failed slide
+    }
+  }
+  return paths
+}
+
+async function tryDownloadSidecarAudio(
+  url: string,
+  jobDir: string
+): Promise<string | undefined> {
+  try {
+    const audioBase = join(jobDir, 'carousel-audio')
+    await runYtdlpDownload(
+      url,
+      buildDownloadFlags(audioBase, true, {
+        sourceUrl: url,
+        imageMode: false,
+      }),
+      env.DOWNLOAD_TIMEOUT_MS,
+      'carousel-audio'
+    )
+    return resolveDownloadedMediaPath(jobDir, 'carousel-audio', false)
+  } catch {
     return undefined
   }
-
-  const albumFiles: string[] = []
-  for (let i = 0; i < urls.length; i++) {
-    const entryOutput = join(jobDir, `entry-${i}.%(ext)s`)
-    await runYtdlpDownload(
-      urls[i],
-      {
-        ...buildDownloadFlags(entryOutput.replace('.%(ext)s', ''), false, {
-          imageMode: true,
-          sourceUrl: urls[i],
-        }),
-        format: SOCIAL_IMAGE_FORMAT,
-        writeInfoJson: false,
-      },
-      env.DOWNLOAD_TIMEOUT_MS,
-      `entry-${i + 1}`
-    )
-    const resolved = await resolveDownloadedMediaPath(jobDir, `entry-${i}`, true)
-    albumFiles.push(resolved)
-  }
-
-  if (albumFiles.length === 1) {
-    return albumFiles[0]
-  }
-  const zipPath = join(jobDir, `album-${jobId}.zip`)
-  await pipeZipArchive(createWriteStream(zipPath), (archive) => {
-    albumFiles.forEach((file, i) => {
-      archive.file(file, { name: `image_${i + 1}.jpg` })
-    })
-  })
-  return zipPath
 }
 
 export default async function downloadUrl(
@@ -223,26 +241,25 @@ export default async function downloadUrl(
       direct: Boolean(downloadJob.directStreamUrl || isFacebookUrl(downloadJob.url)),
     })
 
-    let filePath: string
+    let filePath = ''
+    let photoPaths: string[] | undefined
     let info: YtDlpMetadata | undefined
     let ytdlpResult = { stderr: '' }
 
-    if (albumMode && downloadJob.albumUrls?.length) {
-      filePath = await downloadAlbumAsZip(downloadJob.albumUrls, jobId)
-      info = { title: 'Album' } as YtDlpMetadata
-    } else {
-      filePath = ''
-    }
-
     const isSocial = isSocialCarouselUrl(downloadJob.url)
 
-    if (!filePath && isSocial) {
+    if (albumMode && downloadJob.albumUrls?.length) {
+      photoPaths = await downloadImagesToDir(downloadJob.albumUrls, jobDir)
+      info = { title: 'Album' } as YtDlpMetadata
+    }
+
+    if (!filePath && !photoPaths?.length && isSocial) {
       const imageUrls =
         downloadJob.albumUrls?.filter(Boolean).length
           ? downloadJob.albumUrls!
           : await probeSocialImageUrls(downloadJob.url)
       if (imageUrls.length > 1) {
-        filePath = await downloadAlbumAsZip(imageUrls, jobId)
+        photoPaths = await downloadImagesToDir(imageUrls, jobDir)
         info = { title: 'Album' } as YtDlpMetadata
       } else if (imageUrls.length === 1) {
         filePath = join(jobDir, 'video.jpg')
@@ -281,7 +298,7 @@ export default async function downloadUrl(
         title: 'Facebook',
         ext: ext.replace('.', ''),
       }
-    } else if (!filePath) {
+    } else if (!filePath && !photoPaths?.length) {
       if (isYoutubeUrl(downloadJob.url) && !imageMode && !fileMode && !albumMode) {
         ytdlpResult = await runYoutubeDownload(
           downloadJob.url,
@@ -339,11 +356,13 @@ export default async function downloadUrl(
         const fromInfoOnly = await resolveFromInfoJsonOnly(
           info,
           jobDir,
-          jobId,
+          downloadJob.url,
           isSocial
         )
-        if (fromInfoOnly) {
-          filePath = fromInfoOnly
+        if (fromInfoOnly?.kind === 'album') {
+          photoPaths = fromInfoOnly.paths
+        } else if (fromInfoOnly?.kind === 'single') {
+          filePath = fromInfoOnly.path
         } else {
           try {
             validateMetadata(info, downloadJob.url)
@@ -357,11 +376,13 @@ export default async function downloadUrl(
             const retry = await resolveFromInfoJsonOnly(
               info,
               jobDir,
-              jobId,
+              downloadJob.url,
               isSocial
             )
-            if (retry) {
-              filePath = retry
+            if (retry?.kind === 'album') {
+              photoPaths = retry.paths
+            } else if (retry?.kind === 'single') {
+              filePath = retry.path
             } else {
               throw new Error('Could not resolve downloaded file path')
             }
@@ -380,7 +401,7 @@ export default async function downloadUrl(
           if (isSocial) {
             const urls = await probeSocialImageUrls(downloadJob.url)
             if (urls.length > 1) {
-              filePath = await downloadAlbumAsZip(urls, jobId)
+              photoPaths = await downloadImagesToDir(urls, jobDir)
             } else if (urls.length === 1) {
               filePath = join(jobDir, 'video.jpg')
               await fetchImageToFile(urls[0], filePath)
@@ -400,6 +421,71 @@ export default async function downloadUrl(
         }
       }
     }
+
+    if (photoPaths?.length) {
+      downloadJob.status = DownloadJobStatus.uploading
+      await saveDownloadJob(downloadJob, 'uploading')
+
+      const { doc: originalChat } = await findOrCreateChat(
+        downloadJob.originalChatId
+      )
+      const fileIds = await sendPhotoAlbum(
+        downloadJob.originalChatId,
+        downloadJob.originalMessageId,
+        photoPaths
+      )
+      const totalBytes = (
+        await Promise.all(photoPaths.map((p) => assertFileWithinLimits(p)))
+      ).reduce((a, b) => a + b, 0)
+
+      const audioPath = await tryDownloadSidecarAudio(downloadJob.url, jobDir)
+      if (audioPath) {
+        await sendCompletedFile(
+          downloadJob.originalChatId,
+          downloadJob.originalMessageId,
+          originalChat.language,
+          { audio: true, downloadMode: DownloadMode.audio, plainCaption },
+          info?.title || 'Audio',
+          audioPath
+        )
+      }
+
+      await findOrCreateUrl(
+        {
+          url: downloadJob.url,
+          audio: false,
+          downloadMode: downloadJob.downloadMode,
+          maxHeight: downloadJob.maxHeight,
+          preferredExt: downloadJob.preferredExt,
+        },
+        fileIds[0] || '',
+        info?.title || 'Album'
+      )
+      downloadJob.status = DownloadJobStatus.finished
+      await saveDownloadJob(downloadJob, 'finished')
+      await markLinkLogResult(downloadJob.originalChatId, downloadJob.url, true)
+      await recordUserDownload(
+        downloadJob.originalChatId,
+        totalBytes,
+        downloadJob.downloadMode
+      )
+      await saveUserLink(downloadJob.originalChatId, downloadJob.url, {
+        title: info?.title || 'Album',
+        downloadMode: downloadJob.downloadMode,
+        bytes: totalBytes,
+      })
+      logger.info('download finished (photo album)', {
+        url: downloadJob.url,
+        jobId: downloadJob.id,
+        count: photoPaths.length,
+      })
+      return
+    }
+
+    if (!filePath) {
+      throw new Error('Could not resolve downloaded file path')
+    }
+
     const fileSize = await assertFileWithinLimits(filePath)
     const description =
       typeof info?.description === 'string' ? info.description.trim() : ''
@@ -416,7 +502,7 @@ export default async function downloadUrl(
     )
     const media: SendMediaOptions = {
       audio: downloadJob.audio,
-      downloadMode: albumMode ? DownloadMode.file : downloadJob.downloadMode,
+      downloadMode: downloadJob.downloadMode,
       plainCaption,
       sourceUrl: downloadJob.url,
     }

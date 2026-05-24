@@ -89,10 +89,13 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
       })
     }
 
+    const isReel = /\/reel\//i.test(checkedUrl)
     const wantCarousel =
-      preference === 'carousel' ||
-      (preference === 'auto' &&
-        (offer.hasAlbum || offer.albumUrls.length > 1))
+      !isReel &&
+      offer.videoHeights.length === 0 &&
+      (preference === 'carousel' ||
+        (preference === 'auto' &&
+          (offer.hasAlbum || offer.albumUrls.length > 1)))
 
     if (wantCarousel && offer.albumUrls.length > 0) {
       return createDownloadJobAndRequest(ctx, jobUrl, {
@@ -163,6 +166,14 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
     }
 
     if (!env.SHOW_FORMAT_MENU && preference === 'auto') {
+      if (offer.videoHeights.length > 0 || isReel) {
+        const defaultHeight = offer.videoHeights[0] ?? 720
+        return createDownloadJobAndRequest(ctx, jobUrl, {
+          downloadMode: DownloadMode.video,
+          maxHeight: defaultHeight,
+          audio: false,
+        })
+      }
       if (
         offer.albumUrls.length > 0 &&
         (offer.hasAlbum || offer.albumUrls.length > 1)
@@ -182,20 +193,20 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
           albumUrls: offer.albumUrls,
         })
       }
-      const defaultHeight = offer.videoHeights[0] ?? 720
+      if (offer.hasImage || offer.albumUrls.length === 1) {
+        return createDownloadJobAndRequest(ctx, jobUrl, {
+          downloadMode: DownloadMode.image,
+          maxHeight: offer.imageSizes[0] ?? 0,
+          audio: false,
+          albumUrls: offer.albumUrls.length ? offer.albumUrls : undefined,
+        })
+      }
       const fbStream = offer.facebook
-        ? pickFacebookStream(offer.facebook, defaultHeight)
+        ? pickFacebookStream(offer.facebook, 720)
         : undefined
-      const mode =
-        offer.videoHeights.length === 0 && offer.hasImage
-          ? DownloadMode.image
-          : DownloadMode.video
       return createDownloadJobAndRequest(ctx, jobUrl, {
-        downloadMode: mode,
-        maxHeight:
-          mode === DownloadMode.image
-            ? offer.imageSizes[0] ?? 0
-            : defaultHeight,
+        downloadMode: DownloadMode.video,
+        maxHeight: 720,
         audio: false,
         directStreamUrl: fbStream?.url,
       })

@@ -4,6 +4,7 @@ import { ytdlpErrorI18nKey } from '@/helpers/ytdlpUserMessage'
 const I18N_TO_CODE = {
   error_instagram_restricted: 'instagram_restricted',
   error_instagram_login: 'instagram_login',
+  error_instagram_private: 'instagram_private',
 } as const
 
 /** Turn known yt-dlp stderr into a ValidationError with a user-facing locale key. */

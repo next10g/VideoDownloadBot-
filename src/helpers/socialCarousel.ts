@@ -37,7 +37,9 @@ function probeTimeoutMs(url: string): number {
 }
 
 /** Public IG embed page — fallback when yt-dlp returns "no video in this post". */
-async function scrapeInstagramEmbedImages(postUrl: string): Promise<string[]> {
+export async function scrapeInstagramEmbedImages(
+  postUrl: string
+): Promise<string[]> {
   const base = postUrl.split('?')[0].replace(/\/$/, '')
   const embedUrl = `${base}/embed/captioned/`
   const res = await fetch(embedUrl, {
@@ -55,7 +57,9 @@ async function scrapeInstagramEmbedImages(postUrl: string): Promise<string[]> {
   const urls = new Set<string>()
   const patterns = [
     /"display_url":"([^"]+)"/g,
+    /"display_resources":\[[^\]]*"src":"([^"]+)"/g,
     /"src":"(https:\\\/\\\/[^"]+\.(?:jpg|jpeg|webp)[^"]*)"/gi,
+    /(https:\/\/[^\s"\\]+\.cdninstagram\.com\/[^\s"\\]+)/gi,
   ]
   for (const re of patterns) {
     let match: RegExpExecArray | null

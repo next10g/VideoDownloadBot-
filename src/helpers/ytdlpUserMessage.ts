@@ -8,8 +8,14 @@ export function ytdlpErrorI18nKey(detail: string): string | undefined {
   ) {
     return 'error_instagram_restricted'
   }
-  if (lower.includes('login required') || lower.includes('cookies')) {
-    return 'error_instagram_login'
+  if (
+    lower.includes('only available for registered users') ||
+    lower.includes('follow this account')
+  ) {
+    return 'error_instagram_private'
+  }
+  if (lower.includes('login required')) {
+    return 'error_instagram_private'
   }
   if (lower.includes('no video in this post')) {
     return 'error_instagram_photo_only'

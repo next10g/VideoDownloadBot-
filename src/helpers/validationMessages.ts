@@ -19,6 +19,7 @@ const KEY_BY_CODE: Record<ValidationError['code'], string> = {
   facebook_failed: 'error_facebook_download',
   instagram_restricted: 'error_instagram_restricted',
   instagram_login: 'error_instagram_login',
+  instagram_private: 'error_instagram_private',
 }
 
 export function validationMessage(ctx: Context, error: ValidationError): string {

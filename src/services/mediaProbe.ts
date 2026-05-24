@@ -131,40 +131,27 @@ function offerFromFacebook(
 
 
 function offerFromYtdlp(meta: YtDlpMetadata, downloadUrl?: string): MediaFormatOffer {
-
+  const isReel = Boolean(downloadUrl && /\/reel\//i.test(downloadUrl))
   const formats = (meta as YtDlpMetadata & { formats?: Record<string, unknown>[] })
-
     .formats
-
   const parsed = mergeFormatHints(parseYtdlpFormats(formats), meta)
-  const albumUrls = extractAlbumImageUrls(meta)
+  const albumUrls = isReel ? [] : extractAlbumImageUrls(meta)
 
   return {
-
     title: meta.title || 'Video',
-
     description: meta.description,
-
     videoHeights: parsed.videoHeights,
-
     imageSizes: parsed.imageSizes,
-
     audioExts: parsed.audioExts,
-
     hasImage: parsed.hasImage,
-
     hasAudio: parsed.hasAudio,
-
     downloadUrl,
-
     albumUrls,
-
-    hasAlbum: albumUrls.length > 1 || Boolean(meta.entries && meta.entries.length > 1),
-
+    hasAlbum:
+      !isReel &&
+      (albumUrls.length > 1 || Boolean(meta.entries && meta.entries.length > 1)),
     isFile: downloadUrl ? isGenericFileUrl(downloadUrl) : false,
-
   }
-
 }
 
 
