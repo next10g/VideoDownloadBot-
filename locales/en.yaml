@@ -8,14 +8,37 @@ welcome: |
 
   /download — how to use
   /refer — invite friends
+welcome_menu: |
+  👋 <b>Easy Way</b> · @${bot}
+  👥 <b>${users}</b> users
+
+  Send any link — the bot detects video, image, or audio and shows real qualities.
+
+  <b>Mode:</b> ${mode}
+  /auto · /video · /audio · /image
+mode_label_auto: Smart (auto)
+mode_label_video: Video
+mode_label_audio: Audio
+mode_label_image: Image
+mode_changed: "✅ Mode: <b>${mode}</b>. Send your link."
+btn_menu_help: 📖 Help
+btn_admin_panel: ⚙️ Admin
+admin_panel_intro: "⚙️ <b>Admin panel</b>"
+format_choose_auto: "🤖 Auto-detected — choose type:"
+format_mixed: "✅ Video + image available:"
+error_no_video: "❌ No video in this link. Try /auto or /image."
+error_no_audio: "❌ No separate audio. Try /auto or /video."
 help: |
-  😎 Send me a video link and I'll download it to this chat!
+  😎 Send me a link and I'll download it!
 
   /start — main menu
-  /language — change language
-  /audio — default audio-only mode
-  /image — image mode (enable before sending a link)
-  /refer — your invite link
+  /language — language
+  /auto — smart mode (default)
+  /video — video only
+  /audio — audio only
+  /image — image only
+  /refer — invite link
+  /admin — admin panel
 
   After the link, choose quality / audio / image.
 

@@ -1,10 +1,3 @@
-import Context from '@/models/Context'
+import { handleAudioMode } from '@/handlers/mode'
 
-export default async function handleAudio(ctx: Context) {
-  ctx.dbchat.audio = !ctx.dbchat.audio
-  if (ctx.dbchat.audio) {
-    ctx.dbchat.imagePreferred = false
-  }
-  await ctx.dbchat.save()
-  return ctx.replyWithLocalization(ctx.dbchat.audio ? 'audio_on' : 'audio_off')
-}
+export default handleAudioMode

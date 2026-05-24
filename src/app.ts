@@ -15,6 +15,18 @@ import downloadQueue from '@/helpers/downloadQueue'
 import env from '@/helpers/env'
 import handleAudio from '@/handlers/audio'
 import handleImage from '@/handlers/image'
+import {
+  handleAutoMode,
+  handleModeCallback,
+  handleMenuCallback,
+  handleVideoMode,
+} from '@/handlers/mode'
+import {
+  handleAdminCallback,
+  handleAdminPanel,
+  handleAdminUsers,
+} from '@/handlers/admin'
+import { syncBotProfileUserCount } from '@/helpers/botProfileSync'
 import handleHelp from '@/handlers/help'
 import handleLanguage from '@/handlers/language'
 import handleUrl from '@/handlers/url'
@@ -93,13 +105,19 @@ async function runApp() {
   bot.command('language', handleLanguage)
   bot.command('audio', handleAudio)
   bot.command('image', handleImage)
+  bot.command('auto', handleAutoMode)
+  bot.command('video', handleVideoMode)
   bot.command('refer', handleRefer)
   bot.command('stats', handleAdminStats)
-  bot.command('users', handleAdminStats)
+  bot.command('users', handleAdminUsers)
+  bot.command('admin', handleAdminPanel)
   bot.callbackQuery('retry_sub', handleRetrySubscription)
   bot.callbackQuery('retry_download', handleRetryDownload)
   bot.callbackQuery(/^fmt:/, handleFormatChoice)
   bot.callbackQuery('action:share', handleShareBot)
+  bot.callbackQuery(/^mode:/, handleModeCallback)
+  bot.callbackQuery(/^menu:/, handleMenuCallback)
+  bot.callbackQuery(/^admin:/, handleAdminCallback)
   bot.callbackQuery('noop:language', async (ctx) => {
     await ctx.answerCallbackQuery()
     return handleLanguage(ctx)
@@ -169,6 +187,11 @@ async function runApp() {
     webhookUrl,
     subscription: env.REQUIRED_CHANNEL_ENABLED,
   })
+
+  await syncBotProfileUserCount()
+  setInterval(() => {
+    void syncBotProfileUserCount()
+  }, 3_600_000)
 }
 
 async function shutdown(signal: string) {

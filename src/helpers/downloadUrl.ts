@@ -16,6 +16,7 @@ import { recordDownloadFailure } from '@/helpers/userAbuse'
 import report from '@/helpers/report'
 import { metrics } from '@/lib/metrics'
 import sendCompletedFile from '@/helpers/sendCompletedFile'
+import type { MediaFileStats } from '@/helpers/mediaCaption'
 import { createJobTempDir, removePathSafe } from '@/helpers/tempDir'
 import withTimeout from '@/helpers/withTimeout'
 import logger from '@/lib/logger'
@@ -306,6 +307,16 @@ export default async function downloadUrl(
           ? await getThumbnailUrl(info, jobDir, 'video', fileSize)
           : undefined
 
+    const durationSec =
+      typeof info?.duration === 'number' && info.duration > 0
+        ? info.duration
+        : undefined
+    const fileStats: MediaFileStats = {
+      bytes: fileSize,
+      durationSec:
+        downloadJob.audio || imageMode ? undefined : durationSec,
+    }
+
     const fileId = await withTimeout(
       sendCompletedFile(
         downloadJob.originalChatId,
@@ -314,7 +325,8 @@ export default async function downloadUrl(
         media,
         escapedTitle,
         filePath,
-        thumbPath
+        thumbPath,
+        fileStats
       ),
       env.UPLOAD_TIMEOUT_MS,
       'Telegram upload'

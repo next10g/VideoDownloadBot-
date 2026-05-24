@@ -7,6 +7,7 @@ import {
   prop,
 } from '@typegoose/typegoose'
 import { randomBytes } from 'crypto'
+import type { DownloadPreference } from '@/models/DownloadPreference'
 
 @plugin(findorcreate)
 @modelOptions({ schemaOptions: { timestamps: true } })
@@ -23,6 +24,10 @@ export class Chat extends FindOrCreate {
   /** When true, next links download as image (toggle via /image). */
   @prop({ required: true, default: false })
   imagePreferred!: boolean
+
+  /** auto = smart probe + menu; video | audio | image = fixed type. */
+  @prop({ required: true, default: 'auto' })
+  downloadPreference!: DownloadPreference
 
   @prop()
   lastUrl?: string

@@ -13,6 +13,10 @@ import logger from '@/lib/logger'
 import { metrics } from '@/lib/metrics'
 import videoUploadBot from '@/helpers/videoUploadBot'
 import withTimeout from '@/helpers/withTimeout'
+import {
+  buildFileStatsLine,
+  type MediaFileStats,
+} from '@/helpers/mediaCaption'
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -78,7 +82,8 @@ export default async function sendCompletedFile(
   media: SendMediaOptions,
   title: string,
   file: string | InputFile,
-  thumb?: InputFile | string
+  thumb?: InputFile | string,
+  fileStats?: MediaFileStats
 ): Promise<string> {
   const audio = media.audio
   const isCachedFileId =
@@ -93,7 +98,8 @@ export default async function sendCompletedFile(
       media,
       title,
       file,
-      thumb
+      thumb,
+      fileStats
     )
   }
 
@@ -119,7 +125,8 @@ export default async function sendCompletedFile(
     messageId,
     title,
     media,
-    thumb
+    thumb,
+    fileStats
   )
 
   const botToSend = videoUploadBot
@@ -172,9 +179,17 @@ async function sendCachedFileId(
   media: SendMediaOptions,
   title: string,
   fileId: string,
-  thumb?: InputFile | string
+  thumb?: InputFile | string,
+  fileStats?: MediaFileStats
 ): Promise<string> {
-  const config = buildCaptionConfig(language, messageId, title, media, thumb)
+  const config = buildCaptionConfig(
+    language,
+    messageId,
+    title,
+    media,
+    thumb,
+    fileStats
+  )
   try {
     if (isImageMode(media)) {
       await bot.api.sendPhoto(chatId, fileId, config)
@@ -194,12 +209,18 @@ function buildCaptionConfig(
   messageId: number,
   title: string,
   media: SendMediaOptions,
-  thumb?: InputFile | string
+  thumb?: InputFile | string,
+  fileStats?: MediaFileStats
 ) {
+  const safeTitle = (title || '').replace('<', '&lt;').replace('>', '&gt;')
+  const statsLine = fileStats ? buildFileStatsLine(fileStats) : ''
+  const captionBody = statsLine
+    ? `${safeTitle}\n\n${statsLine}`
+    : safeTitle
   return {
     caption: i18n.t(language, 'video_caption', {
       bot: bot.botInfo.username,
-      title: (title || '').replace('<', '&lt;').replace('>', '&gt;'),
+      title: captionBody,
     }),
     parse_mode: 'HTML' as const,
     reply_to_message_id: messageId,
