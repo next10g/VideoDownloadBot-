@@ -6,3 +6,7 @@ export function isInstagramUrl(url: string): boolean {
     return false
   }
 }
+
+export function isInstagramReelUrl(url: string): boolean {
+  return isInstagramUrl(url) && /\/reel\//i.test(url)
+}

@@ -1,5 +1,7 @@
 import { join } from 'path'
 import { fetchImageToFile } from '@/helpers/fetchImageToFile'
+import { filterSocialImageUrls } from '@/helpers/filterSocialImageUrls'
+import { prepareTelegramPhoto } from '@/helpers/prepareTelegramPhoto'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
 
@@ -8,14 +10,16 @@ export async function downloadImagesToDir(
   urls: string[],
   jobDir: string
 ): Promise<string[]> {
-  const limited = urls.slice(0, env.ALBUM_MAX_IMAGES)
+  const filtered = filterSocialImageUrls(urls)
+  const limited = filtered.slice(0, env.ALBUM_MAX_IMAGES)
   const paths: string[] = []
 
   for (let i = 0; i < limited.length; i++) {
     const dest = join(jobDir, `img${i + 1}.jpg`)
     try {
       await fetchImageToFile(limited[i], dest)
-      paths.push(dest)
+      const ready = await prepareTelegramPhoto(dest, jobDir)
+      paths.push(ready)
     } catch (error) {
       logger.warn('social image skip', {
         index: i,

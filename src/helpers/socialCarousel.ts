@@ -1,3 +1,4 @@
+import { filterSocialImageUrls } from '@/helpers/filterSocialImageUrls'
 import { isFacebookUrl } from '@/helpers/facebookUrl'
 import { isInstagramUrl } from '@/helpers/instagramUrl'
 import logger from '@/lib/logger'
@@ -54,23 +55,35 @@ export async function scrapeInstagramEmbedImages(
     return []
   }
   const html = await res.text()
+  const displayOnly = new Set<string>()
+  const displayRe = /"display_url":"([^"]+)"/g
+  let match: RegExpExecArray | null
+  while ((match = displayRe.exec(html))) {
+    const raw = match[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/')
+    if (raw.startsWith('http')) {
+      displayOnly.add(raw)
+    }
+  }
+  if (displayOnly.size > 0) {
+    return filterSocialImageUrls([...displayOnly], postUrl)
+  }
+
   const urls = new Set<string>()
   const patterns = [
-    /"display_url":"([^"]+)"/g,
     /"display_resources":\[[^\]]*"src":"([^"]+)"/g,
-    /"src":"(https:\\\/\\\/[^"]+\.(?:jpg|jpeg|webp)[^"]*)"/gi,
-    /(https:\/\/[^\s"\\]+\.cdninstagram\.com\/[^\s"\\]+)/gi,
+    /(https:\/\/[^\s"\\]+\.cdninstagram\.com\/[^\s"\\]+\.(?:jpg|jpeg|webp)[^\s"\\]*)/gi,
   ]
   for (const re of patterns) {
-    let match: RegExpExecArray | null
     while ((match = re.exec(html))) {
-      const raw = match[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/')
+      const raw = (match[1] || match[0])
+        .replace(/\\u0026/g, '&')
+        .replace(/\\\//g, '/')
       if (raw.startsWith('http')) {
         urls.add(raw)
       }
     }
   }
-  return [...urls]
+  return filterSocialImageUrls([...urls], postUrl)
 }
 
 async function probeWithYtdlp(url: string, timeout: number): Promise<string[]> {
@@ -87,7 +100,10 @@ export async function probeSocialImageUrls(url: string): Promise<string[]> {
   const timeout = probeTimeoutMs(url)
 
   try {
-    const urls = await probeWithYtdlp(url, timeout)
+    const urls = filterSocialImageUrls(
+      await probeWithYtdlp(url, timeout),
+      url
+    )
     if (urls.length > 0) {
       return urls
     }

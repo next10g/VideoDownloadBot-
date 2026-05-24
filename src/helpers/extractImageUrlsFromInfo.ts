@@ -1,3 +1,4 @@
+import { filterSocialImageUrls } from '@/helpers/filterSocialImageUrls'
 import { scrapeInstagramEmbedImages } from '@/helpers/socialCarousel'
 import { isInstagramUrl } from '@/helpers/instagramUrl'
 import { extractAlbumImageUrls } from '@/services/albumExtract'
@@ -34,5 +35,5 @@ export async function collectImageUrlsFromInfo(
     }
   }
 
-  return [...urls]
+  return filterSocialImageUrls([...urls], pageUrl)
 }

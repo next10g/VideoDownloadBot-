@@ -51,6 +51,8 @@ import {
 import { downloadImagesToDir } from '@/helpers/downloadSocialImages'
 import { sendPhotoAlbum } from '@/helpers/sendPhotoAlbum'
 import { collectImageUrlsFromInfo } from '@/helpers/extractImageUrlsFromInfo'
+import { prepareTelegramPhoto } from '@/helpers/prepareTelegramPhoto'
+import { isInstagramReelUrl } from '@/helpers/instagramUrl'
 
 function escapeTitle(title: string | undefined): string {
   return (title || '').replace('<', '&lt;').replace('>', '&gt;')
@@ -126,16 +128,19 @@ async function resolveFromInfoJsonOnly(
   info: YtDlpMetadata,
   jobDir: string,
   pageUrl: string,
-  isSocial: boolean
+  wantImages: boolean
 ): Promise<ImageDelivery | undefined> {
+  if (!wantImages) {
+    return undefined
+  }
   const urls = await collectImageUrlsFromInfo(info, pageUrl)
-  if (isSocial && urls.length > 1) {
+  if (urls.length > 1) {
     return { kind: 'album', paths: await downloadImagesToDir(urls, jobDir) }
   }
-  if (isSocial && urls.length === 1) {
+  if (urls.length === 1) {
     const dest = join(jobDir, 'video.jpg')
     await fetchImageToFile(urls[0], dest)
-    return { kind: 'single', path: dest }
+    return { kind: 'single', path: await prepareTelegramPhoto(dest, jobDir) }
   }
   if (info.entries?.length && info.entries.length > 1) {
     const entryPaths = await downloadCarouselEntriesFromInfo(info, jobDir)
@@ -221,6 +226,7 @@ export default async function downloadUrl(
     const imageMode = downloadJob.downloadMode === DownloadMode.image
     const albumMode = downloadJob.downloadMode === DownloadMode.album
     const fileMode = downloadJob.downloadMode === DownloadMode.file
+    const wantImages = imageMode || albumMode
     const maxHeight =
       downloadJob.maxHeight > 0 ? downloadJob.maxHeight : env.YOUTUBE_MAX_HEIGHT
     const flagOpts = {
@@ -253,7 +259,7 @@ export default async function downloadUrl(
       info = { title: 'Album' } as YtDlpMetadata
     }
 
-    if (!filePath && !photoPaths?.length && isSocial) {
+    if (!filePath && !photoPaths?.length && isSocial && wantImages) {
       const imageUrls =
         downloadJob.albumUrls?.filter(Boolean).length
           ? downloadJob.albumUrls!
@@ -264,6 +270,7 @@ export default async function downloadUrl(
       } else if (imageUrls.length === 1) {
         filePath = join(jobDir, 'video.jpg')
         await fetchImageToFile(imageUrls[0], filePath)
+        filePath = await prepareTelegramPhoto(filePath, jobDir)
         info = { title: 'Photo', ext: 'jpg' } as YtDlpMetadata
       }
     }
@@ -357,7 +364,7 @@ export default async function downloadUrl(
           info,
           jobDir,
           downloadJob.url,
-          isSocial
+          wantImages
         )
         if (fromInfoOnly?.kind === 'album') {
           photoPaths = fromInfoOnly.paths
@@ -377,7 +384,7 @@ export default async function downloadUrl(
               info,
               jobDir,
               downloadJob.url,
-              isSocial
+              wantImages
             )
             if (retry?.kind === 'album') {
               photoPaths = retry.paths
@@ -398,7 +405,7 @@ export default async function downloadUrl(
         } catch {
           const hint =
             ytdlpResult.stderr.slice(0, 300) || entries.join(', ') || 'empty'
-          if (isSocial) {
+          if (isSocial && wantImages) {
             const urls = await probeSocialImageUrls(downloadJob.url)
             if (urls.length > 1) {
               photoPaths = await downloadImagesToDir(urls, jobDir)
@@ -487,6 +494,14 @@ export default async function downloadUrl(
     }
 
     const fileSize = await assertFileWithinLimits(filePath)
+    if (!wantImages) {
+      if (/\.(jpe?g|webp|png|gif)$/i.test(filePath)) {
+        throw new Error('Download produced image instead of video')
+      }
+      if (isInstagramReelUrl(downloadJob.url) && fileSize < 80_000) {
+        throw new Error('Instagram reel download produced thumbnail only')
+      }
+    }
     const description =
       typeof info?.description === 'string' ? info.description.trim() : ''
     const titleRaw = [info?.title, imageMode && description ? description : '']

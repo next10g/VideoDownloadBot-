@@ -230,6 +230,15 @@ export function buildDownloadFlags(
   } else if (forInstagram) {
     flags.addHeader = IG_HEADERS
     flags.ignoreNoFormatsError = true
+    if (!audio && !imageMode && !fileMode) {
+      flags.format = [
+        `best[ext=mp4][vcodec!=none][acodec!=none][filesize<=${maxFilesize}][height<=${maxHeight}]`,
+        `bestvideo*+bestaudio/best[ext=mp4]/best`,
+        `best[ext=mp4][height<=${maxHeight}][filesize<=${maxFilesize}]`,
+        `best[height<=${maxHeight}][filesize<=${maxFilesize}]`,
+        'best',
+      ].join('/')
+    }
   }
 
   return flags
