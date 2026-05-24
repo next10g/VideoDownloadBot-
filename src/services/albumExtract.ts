@@ -6,11 +6,10 @@ function addImageFormat(urls: Set<string>, f: FormatRow): void {
   const ext = String(f.ext || '')
   const vcodec = String(f.vcodec || 'none')
   const url = String(f.url || '')
-  if (
-    url &&
-    /^jpe?g|png|webp|gif$/i.test(ext) &&
-    (vcodec === 'none' || !vcodec)
-  ) {
+  const looksLikeImage =
+    /^jpe?g|png|webp|gif$/i.test(ext) ||
+    /\.(jpe?g|png|webp)(\?|$)/i.test(url)
+  if (url && looksLikeImage && (vcodec === 'none' || !vcodec || vcodec === '')) {
     urls.add(url)
   }
 }

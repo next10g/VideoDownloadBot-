@@ -57,13 +57,12 @@ function videoFormat(
     ].join('/')
   }
   if (imageMode) {
-    const dim =
-      maxHeight > 0 && maxHeight < 9999 ? maxHeight : env.YOUTUBE_MAX_HEIGHT
     return [
-      `best[ext=jpg][width<=${dim}][filesize<=${maxFilesize}]`,
-      `best[ext=webp][width<=${dim}][filesize<=${maxFilesize}]`,
-      `best[ext=png][width<=${dim}][filesize<=${maxFilesize}]`,
-      `best[height<=${dim}][filesize<=${maxFilesize}]`,
+      'best[vcodec=none]',
+      `best[ext=webp][filesize<=${maxFilesize}]`,
+      `best[ext=jpg][filesize<=${maxFilesize}]`,
+      `best[ext=jpeg][filesize<=${maxFilesize}]`,
+      `best[ext=png][filesize<=${maxFilesize}]`,
       'best',
     ].join('/')
   }
@@ -183,12 +182,20 @@ export function buildDownloadFlags(
   const forInstagram = overrides?.sourceUrl
     ? isInstagramUrl(overrides.sourceUrl)
     : false
+  const allowCarouselPlaylist =
+    env.ALLOW_CAROUSEL &&
+    (forInstagram || forFacebook) &&
+    imageMode
+
   const flags: YtDlpFlags = {
-    ...baseFlags({
-      ...overrides,
-      extractorArgs:
-        overrides?.extractorArgs ?? socialExtractorArgs(),
-    }),
+    ...baseFlags(
+      {
+        ...overrides,
+        extractorArgs:
+          overrides?.extractorArgs ?? socialExtractorArgs(),
+      },
+      { allowMultiEntryPlaylist: allowCarouselPlaylist }
+    ),
     quiet: true,
     output: `${outputBase}.%(ext)s`,
     writeInfoJson: true,
@@ -222,10 +229,15 @@ export function buildDownloadFlags(
     flags.addHeader = FB_HEADERS
   } else if (forInstagram) {
     flags.addHeader = IG_HEADERS
+    flags.ignoreNoFormatsError = true
   }
 
   return flags
 }
+
+/** Loose image format for IG/FB photo posts (webp-first). */
+export const SOCIAL_IMAGE_FORMAT =
+  'best[vcodec=none]/best[ext=webp]/best[ext=jpg]/best[ext=jpeg]/best[ext=png]/best'
 
 function baseFlags(
   overrides?: DownloadFlagOverrides,

@@ -29,7 +29,7 @@ import {
 } from '@/services/facebookEmbed'
 import { sanitizeFacebookUrl } from '@/services/facebookLinkMeta'
 import { resolveFacebookUrl } from '@/services/resolveFacebookUrl'
-import { buildDownloadFlags } from '@/services/ytdlpOptions'
+import { buildDownloadFlags, SOCIAL_IMAGE_FORMAT } from '@/services/ytdlpOptions'
 import { runYoutubeDownload } from '@/services/youtubeDownload'
 import { runYtdlpDownload } from '@/services/ytdlpRunner'
 import type { YtDlpMetadata } from '@/services/ytdlpTypes'
@@ -117,7 +117,28 @@ async function assertFileWithinLimits(filePath: string): Promise<number> {
   return fileStat.size
 }
 
-const IMAGE_ONLY_FORMAT = 'best[ext=jpg]/best[ext=png]/best[ext=webp]/best'
+const IMAGE_ONLY_FORMAT = SOCIAL_IMAGE_FORMAT
+
+async function resolveFromInfoJsonOnly(
+  info: YtDlpMetadata,
+  jobDir: string,
+  jobId: string,
+  isSocial: boolean
+): Promise<string | undefined> {
+  const albumUrls = extractAlbumImageUrls(info)
+  if (isSocial && albumUrls.length > 0) {
+    if (albumUrls.length > 1) {
+      return downloadAlbumAsZip(albumUrls, jobId)
+    }
+    const dest = join(jobDir, 'video.jpg')
+    await fetchImageToFile(albumUrls[0], dest)
+    return dest
+  }
+  if (info.entries?.length && info.entries.length > 1) {
+    return downloadCarouselEntriesFromInfo(info, jobDir, jobId)
+  }
+  return undefined
+}
 
 async function downloadCarouselEntriesFromInfo(
   info: YtDlpMetadata,
@@ -147,7 +168,7 @@ async function downloadCarouselEntriesFromInfo(
           imageMode: true,
           sourceUrl: urls[i],
         }),
-        format: IMAGE_ONLY_FORMAT,
+        format: SOCIAL_IMAGE_FORMAT,
         writeInfoJson: false,
       },
       env.DOWNLOAD_TIMEOUT_MS,
@@ -315,21 +336,16 @@ export default async function downloadUrl(
 
       info = await readInfoJson(jobDir, 'video')
       if (info) {
-        const albumUrls = extractAlbumImageUrls(info)
-        if (isSocial && albumUrls.length > 1) {
-          filePath = await downloadAlbumAsZip(albumUrls, jobId)
-        } else if (isSocial && imageMode && albumUrls.length === 1) {
-          filePath = join(jobDir, 'video.jpg')
-          await fetchImageToFile(albumUrls[0], filePath)
-        } else if (info.entries?.length && info.entries.length > 1) {
-          const fromEntries = await downloadCarouselEntriesFromInfo(
-            info,
-            jobDir,
-            jobId
-          )
-          if (fromEntries) {
-            filePath = fromEntries
-          } else {
+        const fromInfoOnly = await resolveFromInfoJsonOnly(
+          info,
+          jobDir,
+          jobId,
+          isSocial
+        )
+        if (fromInfoOnly) {
+          filePath = fromInfoOnly
+        } else {
+          try {
             validateMetadata(info, downloadJob.url)
             filePath = await resolveDownloadedPath(
               info,
@@ -337,15 +353,19 @@ export default async function downloadUrl(
               'video',
               imageMode
             )
+          } catch {
+            const retry = await resolveFromInfoJsonOnly(
+              info,
+              jobDir,
+              jobId,
+              isSocial
+            )
+            if (retry) {
+              filePath = retry
+            } else {
+              throw new Error('Could not resolve downloaded file path')
+            }
           }
-        } else {
-          validateMetadata(info, downloadJob.url)
-          filePath = await resolveDownloadedPath(
-            info,
-            jobDir,
-            'video',
-            imageMode
-          )
         }
       } else {
         try {
@@ -357,13 +377,26 @@ export default async function downloadUrl(
         } catch {
           const hint =
             ytdlpResult.stderr.slice(0, 300) || entries.join(', ') || 'empty'
-          if (isYoutubeBotBlock(hint)) {
+          if (isSocial) {
+            const urls = await probeSocialImageUrls(downloadJob.url)
+            if (urls.length > 1) {
+              filePath = await downloadAlbumAsZip(urls, jobId)
+            } else if (urls.length === 1) {
+              filePath = join(jobDir, 'video.jpg')
+              await fetchImageToFile(urls[0], filePath)
+            } else {
+              throw new Error(`Download produced no file (${hint})`)
+            }
+          } else if (isYoutubeBotBlock(hint)) {
             throw new Error(hint)
-          }
-          if (isFacebookUrl(downloadJob.url) && hint.includes('Cannot parse')) {
+          } else if (
+            isFacebookUrl(downloadJob.url) &&
+            hint.includes('Cannot parse')
+          ) {
             throw new Error('facebook_parse')
+          } else {
+            throw new Error(`Download produced no file (${hint})`)
           }
-          throw new Error(`Download produced no file (${hint})`)
         }
       }
     }

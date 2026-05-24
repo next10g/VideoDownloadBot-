@@ -115,5 +115,17 @@ export async function resolveDownloadedMediaPath(
   if (found) {
     return found
   }
+
+  const entries = await readdir(jobDir)
+  const media = entries.find(
+    (name) =>
+      /\.(mp4|mkv|webm|mov|m4a|mp3|opus|aac|flac|jpg|jpeg|png|webp|gif)$/i.test(
+        name
+      ) && !name.endsWith('.info.json') && !name.endsWith('.part')
+  )
+  if (media) {
+    return join(jobDir, media)
+  }
+
   throw new Error('Could not resolve downloaded file path')
 }
