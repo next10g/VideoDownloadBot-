@@ -227,6 +227,18 @@ async function tryCarouselDownload(
   postUrl: string,
   jobDir: string
 ): Promise<string[]> {
+  const scraped = await scrapeAllInstagramImages(postUrl)
+  if (scraped.length > 1) {
+    const fetched = await fetchUrlsToDir(
+      scraped.slice(0, env.ALBUM_MAX_IMAGES),
+      postUrl,
+      jobDir
+    )
+    if (fetched.length > 1) {
+      return fetched
+    }
+  }
+
   const pageSlides = await scrapeCarouselFromPostPage(postUrl)
   if (pageSlides.length > 1) {
     const fetched = await fetchUrlsToDir(

@@ -1,4 +1,10 @@
 import { scrapeCarouselFromPostPage } from '@/helpers/instagramCarouselExtract'
+import {
+  dedupeByAssetId,
+  decodeJsonUrl,
+  extractDisplayUrls,
+  extractHighResFromHtml,
+} from '@/helpers/instagramHtmlExtract'
 import { filterSocialImageUrls } from '@/helpers/filterSocialImageUrls'
 import { normalizeMediaUrl } from '@/helpers/normalizeMediaUrl'
 import { isInstagramReelUrl } from '@/helpers/instagramUrl'
@@ -14,67 +20,27 @@ const IG_DESKTOP_UA =
 /** More than this usually means we scraped suggested posts / UI chrome. */
 const SCRAPE_SANITY_MAX = 15
 
-function decodeJsonUrl(raw: string): string {
-  return normalizeMediaUrl(raw.replace(/\\\//g, '/'))
-}
-
-function collectDisplayUrls(html: string, start: number, maxLen: number): string[] {
-  const slice = html.slice(start, start + maxLen)
-  const urls: string[] = []
-  const re = /"display_url":"([^"]+)"/g
-  let match: RegExpExecArray | null
-  while ((match = re.exec(slice))) {
-    const raw = decodeJsonUrl(match[1])
-    if (raw.startsWith('http')) {
-      urls.push(normalizeMediaUrl(raw))
-    }
-  }
-  return urls
-}
-
 const CAROUSEL_MARKERS = [
   'edge_sidecar_to_children',
+  'edge_sidecar',
   'carousel_media',
+  'GraphSidecar',
   'XDTGraphSidecar',
   'sidecar_child',
 ]
-
-/** Highest-width candidate per slide (full resolution, not 640 crop). */
-function extractHighResCandidates(html: string): string[] {
-  const slides: string[] = []
-  const parts = html.split('"image_versions2"')
-  for (let i = 1; i < parts.length; i++) {
-    const section = parts[i].slice(0, 20_000)
-    let bestW = 0
-    let bestUrl = ''
-    const re = /"width":(\d+)[^}]*"url":"([^"]+)"/g
-    let match: RegExpExecArray | null
-    while ((match = re.exec(section))) {
-      const w = Number(match[1])
-      if (w >= bestW) {
-        bestW = w
-        bestUrl = decodeJsonUrl(match[2])
-      }
-    }
-    if (bestUrl.startsWith('http')) {
-      slides.push(normalizeMediaUrl(bestUrl))
-    }
-  }
-  return slides
-}
 
 /** Carousel slides from sidecar / carousel blocks in embed HTML. */
 function extractSidecarDisplayUrls(html: string): string[] {
   for (const marker of CAROUSEL_MARKERS) {
     const idx = html.indexOf(marker)
     if (idx >= 0) {
-      const urls = collectDisplayUrls(html, idx, 500_000)
+      const urls = extractDisplayUrls(html, idx, 500_000)
       if (urls.length > 1) {
-        return urls
+        return dedupeByAssetId(urls)
       }
     }
   }
-  const hiRes = extractHighResCandidates(html)
+  const hiRes = extractHighResFromHtml(html)
   if (hiRes.length > 1) {
     return hiRes
   }
@@ -95,7 +61,9 @@ function extractSinglePostDisplayUrl(html: string): string[] {
       continue
     }
     const chunk = html.slice(idx, idx + 12_000)
-    const m = chunk.match(/"display_url":"([^"]+)"/)
+    const m =
+      chunk.match(/display_url\\":\\"([^"]+)"/) ||
+      chunk.match(/"display_url":"([^"]+)"/)
     if (m) {
       const url = decodeJsonUrl(m[1])
       if (url.startsWith('http')) {
@@ -161,7 +129,7 @@ function parsePostImages(html: string): string[] {
   if (sidecar.length > 0) {
     return sidecar
   }
-  const hiRes = extractHighResCandidates(html)
+  const hiRes = extractHighResFromHtml(html)
   if (hiRes.length === 1) {
     return hiRes
   }
@@ -178,7 +146,7 @@ export async function scrapeAllInstagramImages(postUrl: string): Promise<string[
   }
 
   const fromPage = await scrapeCarouselFromPostPage(postUrl)
-  if (fromPage.length > 0) {
+  if (fromPage.length > 1) {
     return fromPage.slice(0, env.ALBUM_MAX_IMAGES)
   }
 
@@ -207,10 +175,10 @@ export async function scrapeAllInstagramImages(postUrl: string): Promise<string[
     raw = await scrapeOembed(postUrl)
   }
 
-  const filtered = filterSocialImageUrls(raw, postUrl).slice(
-    0,
-    env.ALBUM_MAX_IMAGES
-  )
+  const filtered =
+    raw.length > 1
+      ? dedupeByAssetId(raw).slice(0, env.ALBUM_MAX_IMAGES)
+      : filterSocialImageUrls(raw, postUrl).slice(0, env.ALBUM_MAX_IMAGES)
   if (filtered.length > 0) {
     logger.info('instagram scrape ok', {
       url: postUrl,
