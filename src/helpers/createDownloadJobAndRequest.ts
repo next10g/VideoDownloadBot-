@@ -37,6 +37,7 @@ import {
   youtubeCooldownRemainingSeconds,
 } from '@/helpers/youtubeCooldown'
 import { recordDownloadFailure } from '@/helpers/userAbuse'
+import { saveDbChat } from '@/helpers/saveDbChat'
 
 export interface DownloadRequestOptions extends DownloadJobOptions {
   downloadMode: DownloadMode
@@ -57,7 +58,7 @@ export default async function createDownloadJobAndRequest(
   ctx.dbchat.pendingUrl = undefined
   ctx.dbchat.pendingTitle = undefined
   ctx.dbchat.pendingMediaProbe = undefined
-  await ctx.dbchat.save()
+  await saveDbChat(ctx.dbchat)
 
   if (isOnCooldown(ctx.dbchat.telegramId)) {
     const seconds = cooldownRemainingSeconds(ctx.dbchat.telegramId)

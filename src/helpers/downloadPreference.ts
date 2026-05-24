@@ -3,6 +3,7 @@ import {
   type DownloadPreference,
 } from '@/models/DownloadPreference'
 import type { Chat } from '@/models/Chat'
+import { saveDbChat } from '@/helpers/saveDbChat'
 import Context from '@/models/Context'
 
 export function getDownloadPreference(chat: Chat): DownloadPreference {
@@ -28,7 +29,7 @@ export async function setDownloadPreference(
   chat.downloadPreference = preference
   chat.audio = preference === 'audio'
   chat.imagePreferred = preference === 'image'
-  await ctx.dbchat.save()
+  await saveDbChat(ctx.dbchat)
 }
 
 export function modeLabelKey(preference: DownloadPreference): string {

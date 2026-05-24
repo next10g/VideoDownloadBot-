@@ -3,6 +3,7 @@ import { cwd } from 'process'
 import { load } from 'js-yaml'
 import { readFileSync, readdirSync } from 'fs'
 import { resolve } from 'path'
+import { saveDbChat } from '@/helpers/saveDbChat'
 import Context from '@/models/Context'
 
 interface YamlWithName {
@@ -19,7 +20,7 @@ const localeFile = (path: string) => {
 
 const setLanguage = (languageCode: string) => async (ctx: Context) => {
   ctx.dbchat.language = languageCode
-  await ctx.dbchat.save()
+  await saveDbChat(ctx.dbchat)
   ctx.i18n.locale(languageCode)
   return ctx.editMessageText(ctx.i18n.t('language_selected'), {
     parse_mode: 'HTML',

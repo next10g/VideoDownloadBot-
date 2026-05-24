@@ -1,3 +1,4 @@
+import { saveDbChat } from '@/helpers/saveDbChat'
 import { generateReferralCode } from '@/models/Chat'
 import Context from '@/models/Context'
 
@@ -24,7 +25,7 @@ export async function syncChatProfile(ctx: Context): Promise<void> {
     changed = true
   }
   if (changed) {
-    await ctx.dbchat.save()
+    await saveDbChat(ctx.dbchat)
   }
 }
 
@@ -47,5 +48,5 @@ export async function applyReferralFromStart(
   ctx.dbchat.referredBy = referrer.telegramId
   referrer.referralCount = (referrer.referralCount || 0) + 1
   await referrer.save()
-  await ctx.dbchat.save()
+  await saveDbChat(ctx.dbchat)
 }

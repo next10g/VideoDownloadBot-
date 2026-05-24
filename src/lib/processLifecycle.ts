@@ -23,6 +23,13 @@ export function registerProcessLifecycle(): void {
     if (isBenignTelegramError(reason)) {
       return
     }
+    if (
+      reason instanceof Error &&
+      reason.name === 'ParallelSaveError'
+    ) {
+      logger.warn('parallel chat save (ignored)', { detail: reason.message })
+      return
+    }
     logger.error('unhandledRejection', {
       reason: reason instanceof Error ? reason.message : String(reason),
       stack: reason instanceof Error ? reason.stack : undefined,

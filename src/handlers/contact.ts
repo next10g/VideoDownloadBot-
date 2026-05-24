@@ -1,3 +1,4 @@
+import { saveDbChat } from '@/helpers/saveDbChat'
 import Context from '@/models/Context'
 
 /** Save phone when user shares contact (Telegram does not expose it otherwise). */
@@ -10,6 +11,6 @@ export default async function handleContact(ctx: Context) {
     return ctx.reply(ctx.i18n.t('contact_own_only'))
   }
   ctx.dbchat.phoneNumber = contact.phone_number
-  await ctx.dbchat.save()
+  await saveDbChat(ctx.dbchat)
   return ctx.reply(ctx.i18n.t('contact_saved'))
 }

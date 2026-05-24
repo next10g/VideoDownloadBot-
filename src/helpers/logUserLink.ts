@@ -1,4 +1,5 @@
 import { detectPlatform } from '@/helpers/detectPlatform'
+import { saveDbChat } from '@/helpers/saveDbChat'
 import { DownloadMode } from '@/models/DownloadMode'
 import { LinkLogModel } from '@/models/LinkLog'
 import Context from '@/models/Context'
@@ -17,7 +18,7 @@ export async function logSubmittedLink(
     return
   }
   ctx.dbchat.linkCount = (ctx.dbchat.linkCount || 0) + 1
-  await ctx.dbchat.save()
+  await saveDbChat(ctx.dbchat)
 
   await LinkLogModel.create({
     telegramId: from.id,

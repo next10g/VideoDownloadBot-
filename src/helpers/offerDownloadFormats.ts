@@ -28,13 +28,13 @@ import {
 } from '@/helpers/youtubeCooldown'
 import { isYoutubeUrl } from '@/helpers/youtubeUrl'
 import { isGenericFileUrl } from '@/helpers/isGenericFileUrl'
+import { saveDbChat } from '@/helpers/saveDbChat'
 
 export default async function offerDownloadFormats(ctx: Context, rawUrl: string) {
   const url = normalizeUrl(rawUrl)
   const preference = getDownloadPreference(ctx.dbchat)
   ctx.dbchat.lastUrl = url
   ctx.dbchat.pendingUrl = url
-  const saveChat = ctx.dbchat.save()
 
   if (isOnCooldown(ctx.dbchat.telegramId)) {
     const seconds = cooldownRemainingSeconds(ctx.dbchat.telegramId)
@@ -62,7 +62,6 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
 
   const statusMsg = await ctx.reply(ctx.i18n.t('status_validating'))
   const editor = new MessageEditor(statusMsg.message_id, ctx)
-  await saveChat
 
   try {
     const checkedUrl = await preflightUrl(url)
@@ -128,7 +127,7 @@ export default async function offerDownloadFormats(ctx: Context, rawUrl: string)
     ctx.dbchat.pendingUrl = jobUrl
     ctx.dbchat.pendingTitle = offer.title
     ctx.dbchat.pendingMediaProbe = storeProbe(offer)
-    await ctx.dbchat.save()
+    await saveDbChat(ctx.dbchat)
 
     const stored = loadProbe(ctx.dbchat.pendingMediaProbe)!
 
