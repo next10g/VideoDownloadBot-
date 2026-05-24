@@ -1,4 +1,3 @@
-import { createFetchAgent } from '@/helpers/loadUndici'
 import logger from '@/lib/logger'
 import {
   facebookEmbedCandidates,
@@ -9,7 +8,8 @@ import {
   type FacebookContentKind,
 } from '@/services/facebookLinkMeta'
 import {
-  facebookFetchHeaders,
+  facebookUrlCandidatesFromId,
+  fetchFacebookHtml,
   resolveFacebookUrl,
 } from '@/services/resolveFacebookUrl'
 import { downloadStreamToFile } from '@/services/youtubeStreamDownload'
@@ -114,11 +114,12 @@ function parseImagesFromHtml(html: string): string[] {
       return
     }
     const url = unescapeJsonUrl(raw)
-    if (
-      url.includes('scontent') &&
+    const isImageCdn =
+      (url.includes('scontent') || url.includes('fbcdn.net')) &&
       /\.(jpg|jpeg|png|webp)/i.test(url) &&
-      !url.includes('emoji')
-    ) {
+      !url.includes('emoji') &&
+      !/static\.xx\.fbcdn\.net\/rsrc/i.test(url)
+    if (isImageCdn) {
       urls.add(url)
     }
   }
@@ -128,12 +129,15 @@ function parseImagesFromHtml(html: string): string[] {
   )
 
   for (const match of html.matchAll(
-    /"(?:uri|url|src|image_url|full_size_image)"\s*:\s*"([^"]+)"/gi
+    /"(?:uri|url|src|image_url|full_size_image|viewer_image|photo_image|large_share_image)"\s*:\s*"([^"]+)"/gi
   )) {
-    const url = unescapeJsonUrl(match[1])
-    if (url.includes('scontent')) {
-      push(url)
-    }
+    push(unescapeJsonUrl(match[1]))
+  }
+
+  for (const match of html.matchAll(
+    /"image"\s*:\s*\{\s*"uri"\s*:\s*"([^"]+)"/gi
+  )) {
+    push(unescapeJsonUrl(match[1]))
   }
 
   for (const match of html.matchAll(
@@ -186,24 +190,27 @@ function mergeResult(
   }
 }
 
-async function fetchHtml(url: string, timeoutMs: number): Promise<string> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    const dispatcher = createFetchAgent(timeoutMs)
-    const response = await fetch(url, {
-      signal: controller.signal,
-      ...(dispatcher ? { dispatcher } : {}),
-      headers: facebookFetchHeaders(true),
-      redirect: 'follow',
-    } as RequestInit)
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
+async function fetchHtml(
+  url: string,
+  timeoutMs: number,
+  mobile = true
+): Promise<string> {
+  return fetchFacebookHtml(url, timeoutMs, mobile)
+}
+
+async function fetchHtmlBestEffort(
+  url: string,
+  timeoutMs: number
+): Promise<string> {
+  let lastError: Error | undefined
+  for (const mobile of [true, false]) {
+    try {
+      return await fetchHtml(url, timeoutMs, mobile)
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
     }
-    return await response.text()
-  } finally {
-    clearTimeout(timer)
   }
+  throw lastError ?? new Error('fetch failed')
 }
 
 function pluginPostUrl(href: string): string {
@@ -242,7 +249,9 @@ async function scrapeTargets(
 
   for (const target of targets) {
     try {
-      const html = await fetchHtml(target, perTargetMs)
+      const html = target.includes('plugins/')
+        ? await fetchHtml(target, perTargetMs, true)
+        : await fetchHtmlBestEffort(target, perTargetMs)
       const streams = parseStreamsFromHtml(html)
       const images = parseImagesFromHtml(html)
       const imageUrl = images[0]
@@ -351,7 +360,10 @@ export async function probeFacebookEmbed(
 
   const tryPhotoFirst =
     meta.kind === 'photo' ||
+    meta.kind === 'post' ||
     /\/share\/p\//i.test(rawUrl) ||
+    /\/posts\/pfbid/i.test(rawUrl) ||
+    /\/posts\/pfbid/i.test(resolvedUrl) ||
     resolvedUrl.includes('photo.php') ||
     resolvedUrl.includes('story.php')
 

@@ -7,6 +7,7 @@ export interface FacebookLinkMeta {
   storyFbid?: string
   pageId?: string
   photoFbid?: string
+  pfbid?: string
   videoId?: string
   groupId?: string
   permalinkId?: string
@@ -18,7 +19,11 @@ export function parseFacebookLinkMeta(url: string): FacebookLinkMeta {
     const u = new URL(url)
     const path = u.pathname.toLowerCase()
 
-    if (/\/share\/p\//i.test(url) || path.includes('photo.php') || path === '/photo/') {
+    const pfbid = path.match(/\/(pfbid[A-Za-z0-9]+)/i)?.[1]
+    if (pfbid) {
+      meta.pfbid = pfbid
+      meta.kind = 'photo'
+    } else if (/\/share\/p\//i.test(url) || path.includes('photo.php') || path === '/photo/') {
       meta.kind = 'photo'
     } else if (
       /\/share\/[rv]\//i.test(url) ||
@@ -29,7 +34,7 @@ export function parseFacebookLinkMeta(url: string): FacebookLinkMeta {
       meta.kind = 'video'
     } else if (path.includes('story.php')) {
       meta.kind = 'photo'
-    } else if (path.includes('/groups/')) {
+    } else if (path.includes('/groups/') || /\/posts\//i.test(path)) {
       meta.kind = 'post'
     }
 
@@ -160,6 +165,19 @@ export function facebookEmbedCandidates(
     )
   }
 
+  if (meta.pfbid) {
+    try {
+      const u = new URL(resolvedUrl)
+      const pageSlug = u.pathname.split('/posts/')[0]
+      if (pageSlug) {
+        push(`https://www.facebook.com${pageSlug}/posts/${meta.pfbid}`)
+      }
+    } catch {
+      // skip
+    }
+    push(resolvedUrl)
+  }
+
   return [...new Set(out)]
 }
 
@@ -169,7 +187,7 @@ export function facebookPhotoCandidates(
 ): string[] {
   return facebookEmbedCandidates(rawUrl, resolvedUrl).filter(
     (u) =>
-      /photo\.php|photo\/|story\.php|share\/p\//i.test(u) ||
+      /photo\.php|photo\/|story\.php|share\/p\/|\/posts\/pfbid/i.test(u) ||
       parseFacebookLinkMeta(u).kind === 'photo'
   )
 }

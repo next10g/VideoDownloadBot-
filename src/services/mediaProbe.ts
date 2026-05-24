@@ -129,11 +129,23 @@ async function probeYtdlp(url: string): Promise<MediaFormatOffer> {
   return offerFromYtdlp(meta, url)
 }
 
-function isFacebookPhotoLink(url: string, downloadUrl: string): boolean {
-  if (/\/share\/p\//i.test(url)) {
+/** Numeric photo.php / share/p — embed only (yt-dlp never works on Hostinger). */
+function isStrictFacebookPhotoOnly(downloadUrl: string, rawUrl: string): boolean {
+  return (
+    /photo\.php\?fbid=|\/share\/p\//i.test(downloadUrl) ||
+    /\/share\/p\//i.test(rawUrl)
+  )
+}
+
+function isFacebookPhotoOrPost(url: string, downloadUrl: string): boolean {
+  if (/\/posts\/pfbid/i.test(url) || /\/posts\/pfbid/i.test(downloadUrl)) {
     return true
   }
-  return parseFacebookLinkMeta(downloadUrl).kind === 'photo'
+  if (isStrictFacebookPhotoOnly(downloadUrl, url)) {
+    return true
+  }
+  const kind = parseFacebookLinkMeta(downloadUrl).kind
+  return kind === 'photo' || kind === 'post'
 }
 
 /** Probe link and decide which download buttons to show (no cookies). */
@@ -145,14 +157,15 @@ export async function probeMediaOffer(url: string): Promise<MediaFormatOffer> {
       return offerFromFacebook(embed)
     }
 
-    const photoLink = isFacebookPhotoLink(url, downloadUrl)
+    const photoOrPost = isFacebookPhotoOrPost(url, downloadUrl)
     logger.warn('facebook embed empty', {
       url,
       resolvedUrl: downloadUrl,
-      photoLink,
+      photoOrPost,
+      strictPhoto: isStrictFacebookPhotoOnly(downloadUrl, url),
     })
 
-    if (photoLink) {
+    if (isStrictFacebookPhotoOnly(downloadUrl, url)) {
       throw new ValidationError(
         'Facebook photo could not be loaded from this server (public posts only)',
         'facebook_failed'

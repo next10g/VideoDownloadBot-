@@ -38,6 +38,9 @@ function isUsableFacebookUrl(url: string): boolean {
   if (/\/share\//i.test(url) && !/\/share\/[rvp]\//i.test(url)) {
     return false
   }
+  if (/web\.facebook\.com/i.test(url)) {
+    return false
+  }
   return true
 }
 
@@ -255,6 +258,9 @@ export async function resolveFacebookUrl(url: string): Promise<string> {
   }
 
   const normalized = normalizeUrl(url)
+  if (/web\.facebook\.com/i.test(url) && normalized.includes('www.facebook.com')) {
+    logger.info('facebook host canonicalized', { from: url, to: normalized })
+  }
   if (isUsableFacebookUrl(normalized) && !/\/share\//i.test(normalized)) {
     return sanitizeFacebookUrl(normalized, url)
   }

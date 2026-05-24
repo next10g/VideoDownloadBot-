@@ -43,7 +43,8 @@ export function normalizeUrl(raw: string): string {
     if (
       url.hostname === 'facebook.com' ||
       url.hostname === 'fb.com' ||
-      url.hostname === 'm.facebook.com'
+      url.hostname === 'm.facebook.com' ||
+      url.hostname === 'web.facebook.com'
     ) {
       url.hostname = 'www.facebook.com'
     }
