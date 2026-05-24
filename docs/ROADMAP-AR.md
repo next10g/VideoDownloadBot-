@@ -4,44 +4,56 @@
 
 | الميزة | الحالة |
 |--------|--------|
-| اختيار نوع التحميل (فيديو 360–1080 / صوت / صورة) | ✅ |
-| حفظ الروابط + يوزر + منصة في MongoDB (`LinkLog`) | ✅ |
-| `/stats` و `/users` للأدمن (مستخدمون، روابط، أخطاء، منصات، إحالات) | ✅ |
-| `/refer` + رابط `?start=ref_xxx` + زر مشاركة | ✅ |
-| صور تيليجرام مع الكابشن | ✅ |
-| تحسين TikTok/Facebook (extractor-args) | ✅ جزئي |
-| دمج قوائم Invidious/Piped + تطبيع روابط `.env` | ✅ |
+| اختيار نوع التحميل (فيديو / صوت / صورة) + أوضاع `/auto` `/video` `/audio` `/image` | ✅ |
+| قائمة جودات **حقيقية** من probe (فيديو 360–1080 حسب الرابط) | ✅ |
+| أزرار **صوت متعددة** (M4A / MP3 / OPUS…) عند توفرها | ✅ |
+| أزرار **صورة بعدة أحجام** عند توفرها في formats | ✅ |
+| حجم الملف + المدة في الكابشن بعد الرفع | ✅ |
+| `/start` غني + لوحة أدمن + عدد المستخدمين في الوصف القصير | ✅ |
+| فيسبوك Reels / share/v / pfbid / صور (بدون كوكيز) | ✅ جزئي |
+| إنستغرام: تطبيع روابط + Referer في yt-dlp | ✅ جزئي |
+| حفظ الروابط + يوزر + منصة (`LinkLog`) | ✅ |
+| `/stats` `/users` `/admin` + إحالة | ✅ |
 
 ## ما يحتاج سيرفر أقوى (VPS) — ليس Hostinger فقط
 
 | الميزة | السبب |
 |--------|--------|
 | يوتيوب «نهائي» 100% بدون كوكيز | IP الاستضافة المشتركة محظور من Google ومن خوادم Invidious/Piped |
-| إزالة علامة يوتيوب المائية | ليست ميزة yt-dlp رسمية؛ الشورتات watermark مدمج في الفيديو |
-| كل روابط فيسبوك (جروبات خاصة / إعلانات مقفولة) | تحتاج جلسة أو API خاص |
+| كل روابط فيسبوك `share/p/` → photo.php فقط | أحياناً HTML فارغ من IP الاستضافة؛ الأفضل pfbid في الرابط |
+| إنستغرام Stories / حسابات خاصة | تحتاج جلسة أو API |
 
-**الحل الواقعي ليوتيوب عام:** VPS صغير (Hetzner ~5€) + `YOUTUBE_BACKEND=auto` أو خادم Invidious خاص.
+**الحل الواقعي ليوتيوب عام:** VPS صغير + `YOUTUBE_BACKEND=auto` أو Invidious خاص.
 
 ## مرحلة قادمة (يمكن طلبها)
 
-- لوحة أدمن داخل تيليجرام (تصدير CSV للروابط)
-- ربط Telegram Business (`business_connection` updates)
-- مكافآت الإحالة (تحميلات مجانية بعد N دعوة)
-- اختيار جودة من قائمة formats الحقيقية بعد probe
-- دعم Stories / Reels بشكل منفصل
+- تصدير CSV للروابط من لوحة الأدمن
+- ربط Telegram Business
+- مكافآت الإحالة (تحميلات بعد N دعوة)
+- ffmpeg مدمج في `bin/` للدمج والثمبنيل
+- عدد المستخدمين في **اسم** البوت (يدوي من BotFather)
 
 ## أوامر البوت بعد النشر
 
 ```
-/start   — ترحيب + دعوة
-/download — مساعدة
+/start   — ترحيب + أوضاع التحميل
+/auto    — ذكي (قائمة جودات)
+/video   — فيديو
+/audio   — صوت
+/image   — صورة
+/admin   — لوحة الأدمن (ADMIN_ID)
 /refer   — رابط الإحالة
-/stats   — إحصائيات (ADMIN_ID فقط)
 ```
+
+## BotFather والأدمن
+
+راجع **[BOTFATHER-AR.md](./BOTFATHER-AR.md)** — `ADMIN_ID`، أوامر مخفية عن الجمهور، وتأمين `/diagnostics`.
 
 ## نشر على Hostinger
 
 ```bash
+cd ~/domains/t.nextegypt-agri.com/nodejs
+/opt/alt/alt-nodejs20/root/usr/bin/node scripts/hostinger-install.js
 /opt/alt/alt-nodejs20/root/usr/bin/node scripts/hostinger-build.js
 ```
 
@@ -51,5 +63,12 @@
 SHOW_FORMAT_MENU=true
 YOUTUBE_MAX_HEIGHT=1080
 REFERRAL_ENABLED=true
-# احذف INVIDIOUS_API_URLS أو صحّحها بصيغة https://صغيرة
+YOUTUBE_USE_COOKIES=false
 ```
+
+## رسائل نجاح في اللوج
+
+- `facebook share probe ok` / `facebook photo probe ok`
+- `facebook direct download`
+- `instagram probe`
+- `download finished`

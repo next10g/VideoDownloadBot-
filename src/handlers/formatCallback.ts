@@ -50,6 +50,7 @@ export async function handleFormatChoice(ctx: Context) {
     return createDownloadJobAndRequest(ctx, jobUrl, {
       downloadMode: parsed.mode,
       maxHeight: parsed.maxHeight,
+      preferredExt: parsed.preferredExt,
       audio: parsed.mode === DownloadMode.audio,
       directStreamUrl,
     })

@@ -98,7 +98,7 @@ export async function probeUrlMetadata(url: string): Promise<YtDlpMetadata> {
   try {
     const raw = await runYtdlpJson(
       url,
-      buildProbeFlags(),
+      buildProbeFlags(url),
       env.YTDLP_PROBE_TIMEOUT_MS,
       'probe'
     )

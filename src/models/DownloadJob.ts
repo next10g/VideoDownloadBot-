@@ -42,6 +42,10 @@ export default class DownloadJob extends FindOrCreate {
   @prop({ default: 0, index: true })
   maxHeight!: number
 
+  /** Audio container from format menu (m4a, mp3, opus). */
+  @prop({ default: '' })
+  preferredExt!: string
+
   @prop()
   directStreamUrl?: string
 

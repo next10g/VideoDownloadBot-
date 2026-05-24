@@ -1,20 +1,16 @@
 import { InlineKeyboard } from 'grammy'
-import env from '@/helpers/env'
 import {
   formatAdminLinksPage,
   formatAdminPanel,
   formatAdminUsersPage,
 } from '@/helpers/adminPanel'
+import { isBotAdmin } from '@/helpers/isBotAdmin'
 import Context from '@/models/Context'
 import report from '@/helpers/report'
 
-function isAdmin(ctx: Context): boolean {
-  return ctx.from?.id === env.ADMIN_ID
-}
-
 export async function handleAdminStats(ctx: Context) {
-  if (!isAdmin(ctx)) {
-    return ctx.reply(ctx.i18n.t('error_private_bot'))
+  if (!isBotAdmin(ctx)) {
+    return
   }
   try {
     return ctx.reply(await formatAdminPanel(), { parse_mode: 'HTML' })
@@ -25,8 +21,8 @@ export async function handleAdminStats(ctx: Context) {
 }
 
 export async function handleAdminUsers(ctx: Context) {
-  if (!isAdmin(ctx)) {
-    return ctx.reply(ctx.i18n.t('error_private_bot'))
+  if (!isBotAdmin(ctx)) {
+    return
   }
   try {
     const page = 0
@@ -46,8 +42,8 @@ export async function handleAdminUsers(ctx: Context) {
 }
 
 export async function handleAdminPanel(ctx: Context) {
-  if (!isAdmin(ctx)) {
-    return ctx.reply(ctx.i18n.t('error_private_bot'))
+  if (!isBotAdmin(ctx)) {
+    return
   }
   const kb = new InlineKeyboard()
     .text('📊 إحصائيات', 'admin:stats')
@@ -61,8 +57,8 @@ export async function handleAdminPanel(ctx: Context) {
 }
 
 export async function handleAdminCallback(ctx: Context) {
-  if (!isAdmin(ctx)) {
-    await ctx.answerCallbackQuery({ text: 'Admin only' })
+  if (!isBotAdmin(ctx)) {
+    await ctx.answerCallbackQuery()
     return
   }
   await ctx.answerCallbackQuery()

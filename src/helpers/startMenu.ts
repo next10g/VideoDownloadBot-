@@ -5,6 +5,7 @@ import { collectBotStats } from '@/helpers/botStats'
 import Context from '@/models/Context'
 import bot from '@/helpers/bot'
 import env from '@/helpers/env'
+import { isBotAdmin } from '@/helpers/isBotAdmin'
 
 export async function buildWelcomeText(ctx: Context): Promise<string> {
   const pref = getDownloadPreference(ctx.dbchat)
@@ -42,7 +43,7 @@ export function buildStartKeyboard(ctx: Context): InlineKeyboard {
     kb.text(ctx.i18n.t('btn_invite_friend'), 'menu:refer')
   }
 
-  if (ctx.from?.id === env.ADMIN_ID) {
+  if (isBotAdmin(ctx)) {
     kb.row()
     kb.text(ctx.i18n.t('btn_admin_panel'), 'admin:panel')
   }

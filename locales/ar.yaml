@@ -57,7 +57,6 @@ help: |
   /audio — صوت فقط
   /image — صورة فقط (مثالي لفيسبوك Share)
   /refer — رابط دعوة الأصدقاء
-  /admin — لوحة الأدمن (للمطور)
 
   <b>بعد اللينك:</b> اختار جودة الفيديو أو صوت أو صورة.
   <b>صورة من البوست:</b> اختار «صورة» — هيجيب الصورة والوصف لو موجود.
@@ -65,6 +64,11 @@ help: |
   يشتغل في الخاص والجروبات والقنوات (ضيف البوت وأرسل اللينك).
 
   المطور: <b>Nour Mohamed</b> — @Dev_Nour_M
+help_admin: |
+  <b>أوامر الأدمن (أنت فقط):</b>
+  /admin — لوحة التحكم
+  /stats — إحصائيات
+  /users — المستخدمون والروابط
 format_choose: |
   ✅ اللينك اتفحص. اختار نوع التحميل:
 format_image_only: |
@@ -77,7 +81,9 @@ format_choose_with_title: |
   اختار نوع التحميل:
 btn_format_video: "🎬 فيديو ${height}p"
 btn_format_audio: "🎵 صوت بس"
+btn_format_audio_ext: "🎵 ${ext}"
 btn_format_image: "🖼 صورة + وصف"
+btn_format_image_size: "🖼 ${size}px"
 btn_share_bot: "📤 شارك البوت"
 btn_invite_friend: "🎁 ادعُ صديق"
 btn_language_menu: "🌐 اللغة"

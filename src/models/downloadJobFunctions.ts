@@ -5,6 +5,7 @@ export interface DownloadJobOptions {
   audio: boolean
   downloadMode?: DownloadMode
   maxHeight?: number
+  preferredExt?: string
   directStreamUrl?: string
 }
 
@@ -16,16 +17,18 @@ export function findOrCreateDownloadJob(
 ) {
   const downloadMode = options.downloadMode ?? DownloadMode.video
   const maxHeight = options.maxHeight ?? 0
+  const preferredExt = options.preferredExt ?? ''
   const audio =
     options.audio || downloadMode === DownloadMode.audio
 
   return DownloadJobModel.findOrCreate(
-    { url, audio, downloadMode, maxHeight },
+    { url, audio, downloadMode, maxHeight, preferredExt },
     {
       originalChatId,
       originalMessageId,
       downloadMode,
       maxHeight,
+      preferredExt,
       directStreamUrl: options.directStreamUrl,
     }
   )
@@ -37,9 +40,16 @@ export function deleteDownloadJob(
 ) {
   const downloadMode = options.downloadMode ?? DownloadMode.video
   const maxHeight = options.maxHeight ?? 0
+  const preferredExt = options.preferredExt ?? ''
   const audio =
     options.audio || downloadMode === DownloadMode.audio
-  return DownloadJobModel.deleteMany({ url, audio, downloadMode, maxHeight })
+  return DownloadJobModel.deleteMany({
+    url,
+    audio,
+    downloadMode,
+    maxHeight,
+    preferredExt,
+  })
 }
 
 export function findAllDownloadJobs() {

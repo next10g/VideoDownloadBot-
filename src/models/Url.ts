@@ -13,6 +13,8 @@ export class Url {
   downloadMode!: DownloadMode
   @prop({ default: 0, index: true })
   maxHeight!: number
+  @prop({ default: '' })
+  preferredExt!: string
   @prop({ required: true })
   title!: string
 }
@@ -24,6 +26,7 @@ export interface UrlCacheKey {
   audio: boolean
   downloadMode?: DownloadMode
   maxHeight?: number
+  preferredExt?: string
 }
 
 export function findUrl(key: UrlCacheKey) {
@@ -32,6 +35,7 @@ export function findUrl(key: UrlCacheKey) {
     audio: key.audio,
     downloadMode: key.downloadMode ?? DownloadMode.video,
     maxHeight: key.maxHeight ?? 0,
+    preferredExt: key.preferredExt ?? '',
   })
 }
 
@@ -42,11 +46,13 @@ export async function findOrCreateUrl(
 ) {
   const downloadMode = key.downloadMode ?? DownloadMode.video
   const maxHeight = key.maxHeight ?? 0
+  const preferredExt = key.preferredExt ?? ''
   const dburl = await UrlModel.findOne({
     url: key.url,
     audio: key.audio,
     downloadMode,
     maxHeight,
+    preferredExt,
   })
   if (dburl) {
     return dburl
@@ -57,6 +63,7 @@ export async function findOrCreateUrl(
     audio: key.audio,
     downloadMode,
     maxHeight,
+    preferredExt,
     title,
   })
 }

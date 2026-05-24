@@ -1,5 +1,6 @@
 import env from '@/helpers/env'
 import { isFacebookUrl } from '@/helpers/facebookUrl'
+import { isInstagramUrl } from '@/helpers/instagramUrl'
 import { getFfmpegPath } from '@/services/ffmpegPath'
 import { resolveCookiePool, shouldLoadYoutubeCookiePool } from '@/services/ytdlpCookies'
 import { getYtdlpJsRuntimesFlag, resolveNodeForYtdlp } from '@/services/ytdlpNodeRuntime'
@@ -22,7 +23,8 @@ export interface DownloadFlagOverrides {
   relaxedFormat?: boolean
   maxHeight?: number
   imageMode?: boolean
-  /** Facebook / TikTok share links need site-specific extractor args. */
+  preferredAudioExt?: string
+  /** Facebook / TikTok / Instagram share links need site-specific extractor args. */
   sourceUrl?: string
 }
 
@@ -30,17 +32,29 @@ function videoFormat(
   audio: boolean,
   relaxed: boolean,
   maxHeight: number,
-  imageMode: boolean
+  imageMode: boolean,
+  audioExt?: string
 ): string {
   if (imageMode) {
+    const dim =
+      maxHeight > 0 && maxHeight < 9999 ? maxHeight : env.YOUTUBE_MAX_HEIGHT
     return [
-      `best[ext=jpg][filesize<=${maxFilesize}]`,
-      `best[ext=webp][filesize<=${maxFilesize}]`,
-      `best[ext=png][filesize<=${maxFilesize}]`,
+      `best[ext=jpg][width<=${dim}][filesize<=${maxFilesize}]`,
+      `best[ext=webp][width<=${dim}][filesize<=${maxFilesize}]`,
+      `best[ext=png][width<=${dim}][filesize<=${maxFilesize}]`,
+      `best[height<=${dim}][filesize<=${maxFilesize}]`,
       'best',
     ].join('/')
   }
   if (audio) {
+    if (audioExt) {
+      return [
+        `bestaudio[ext=${audioExt}][filesize<=${maxFilesize}]`,
+        `bestaudio[ext=${audioExt}][filesize_approx<=${maxFilesize}]`,
+        `bestaudio[ext=${audioExt}]`,
+        'bestaudio',
+      ].join('/')
+    }
     return `bestaudio[filesize<=${maxFilesize}]/bestaudio[filesize_approx<=${maxFilesize}]/bestaudio`
   }
   const h = maxHeight
@@ -84,6 +98,11 @@ const FB_HEADERS = [
   `User-Agent:${FB_UA}`,
 ]
 
+const IG_HEADERS = [
+  'Referer:https://www.instagram.com/',
+  `User-Agent:${FB_UA}`,
+]
+
 /** Call at startup — Node runtime + optional cookie pool for admin mode. */
 export async function initYtdlpOptions(): Promise<void> {
   await resolveNodeForYtdlp()
@@ -93,12 +112,18 @@ export async function initYtdlpOptions(): Promise<void> {
   cookiesPoolReady = true
 }
 
-export function buildProbeFlags(): YtDlpFlags {
-  return {
+export function buildProbeFlags(sourceUrl?: string): YtDlpFlags {
+  const flags: YtDlpFlags = {
     ...baseFlags(),
     skipDownload: true,
     dumpSingleJson: true,
   }
+  if (sourceUrl && isFacebookUrl(sourceUrl)) {
+    flags.addHeader = FB_HEADERS
+  } else if (sourceUrl && isInstagramUrl(sourceUrl)) {
+    flags.addHeader = IG_HEADERS
+  }
+  return flags
 }
 
 export function buildDownloadFlags(
@@ -117,6 +142,9 @@ export function buildDownloadFlags(
   const forFacebook = overrides?.sourceUrl
     ? isFacebookUrl(overrides.sourceUrl)
     : false
+  const forInstagram = overrides?.sourceUrl
+    ? isInstagramUrl(overrides.sourceUrl)
+    : false
   const flags: YtDlpFlags = {
     ...baseFlags({
       ...overrides,
@@ -126,7 +154,13 @@ export function buildDownloadFlags(
     quiet: true,
     output: `${outputBase}.%(ext)s`,
     writeInfoJson: true,
-    format: videoFormat(audio, relaxed, maxHeight, imageMode),
+    format: videoFormat(
+      audio,
+      relaxed,
+      maxHeight,
+      imageMode,
+      overrides?.preferredAudioExt
+    ),
     formatSort: relaxed
       ? `res:${maxHeight},ext:mp4:m4a,size`
       : `res:${maxHeight},ext:mp4:m4a,proto:https,codec:h264,size`,
@@ -147,6 +181,8 @@ export function buildDownloadFlags(
 
   if (forFacebook) {
     flags.addHeader = FB_HEADERS
+  } else if (forInstagram) {
+    flags.addHeader = IG_HEADERS
   }
 
   return flags

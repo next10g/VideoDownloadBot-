@@ -41,6 +41,7 @@ import { recordDownloadFailure } from '@/helpers/userAbuse'
 export interface DownloadRequestOptions extends DownloadJobOptions {
   downloadMode: DownloadMode
   maxHeight: number
+  preferredExt?: string
 }
 
 export default async function createDownloadJobAndRequest(
@@ -110,6 +111,7 @@ export default async function createDownloadJobAndRequest(
           audio,
           downloadMode: requestOpts.downloadMode,
           maxHeight: requestOpts.maxHeight,
+          preferredExt: requestOpts.preferredExt,
         },
         ctx,
         downloadMessageEditor
@@ -153,6 +155,7 @@ export default async function createDownloadJobAndRequest(
         audio,
         downloadMode: requestOpts.downloadMode,
         maxHeight: requestOpts.maxHeight,
+        preferredExt: requestOpts.preferredExt,
         directStreamUrl: requestOpts.directStreamUrl,
       },
       ctx.dbchat.telegramId,

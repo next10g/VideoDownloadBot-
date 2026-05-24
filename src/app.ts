@@ -27,6 +27,7 @@ import {
   handleAdminUsers,
 } from '@/handlers/admin'
 import { syncBotProfileUserCount } from '@/helpers/botProfileSync'
+import { syncBotCommands } from '@/helpers/syncBotCommands'
 import handleHelp from '@/handlers/help'
 import handleLanguage from '@/handlers/language'
 import handleUrl from '@/handlers/url'
@@ -154,6 +155,12 @@ async function runApp() {
         return
       }
       if (req.method === 'GET' && url === '/diagnostics') {
+        const secret = req.headers['x-webhook-secret']
+        if (secret !== env.WEBHOOK_SECRET) {
+          res.writeHead(404)
+          res.end()
+          return
+        }
         const diagnostics = await collectHealthDiagnostics()
         res.writeHead(200, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify(diagnostics, null, 2))
@@ -188,6 +195,7 @@ async function runApp() {
     subscription: env.REQUIRED_CHANNEL_ENABLED,
   })
 
+  await syncBotCommands()
   await syncBotProfileUserCount()
   setInterval(() => {
     void syncBotProfileUserCount()

@@ -72,6 +72,7 @@ export async function findOrCreateDownloadRequest(
         audio: downloadJob.audio,
         downloadMode: downloadJob.downloadMode,
         maxHeight: downloadJob.maxHeight,
+        preferredExt: downloadJob.preferredExt ?? '',
       })
       if (!url) {
         throw new Error('Cached url not found')

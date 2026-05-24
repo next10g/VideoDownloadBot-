@@ -38,18 +38,24 @@ help: |
   /audio — audio only
   /image — image only
   /refer — invite link
-  /admin — admin panel
 
   After the link, choose quality / audio / image.
 
   Developer: <b>Nour Mohamed</b> — @Dev_Nour_M
+help_admin: |
+  <b>Admin (you only):</b>
+  /admin — panel
+  /stats — statistics
+  /users — users & links
 format_choose: "✅ Link OK. Choose download type:"
 format_image_only: "🖼 This link is an image. Tap download image:"
 format_video_only: "🎬 Video — pick an available quality:"
 format_choose_with_title: "✅ <b>${title}</b>\n\nChoose download type:"
 btn_format_video: "🎬 Video ${height}p"
 btn_format_audio: "🎵 Audio only"
+btn_format_audio_ext: "🎵 ${ext}"
 btn_format_image: "🖼 Image + caption"
+btn_format_image_size: "🖼 ${size}px"
 btn_share_bot: "📤 Share bot"
 btn_invite_friend: "🎁 Invite friend"
 btn_language_menu: "🌐 Language"

@@ -80,6 +80,7 @@ async function sendFileToNonOriginalRequests(
     audio: downloadJob.audio,
     downloadMode: downloadJob.downloadMode ?? DownloadMode.video,
     maxHeight: downloadJob.maxHeight ?? 0,
+    preferredExt: downloadJob.preferredExt ?? '',
   })
   if (!cachedUrl) {
     throw new Error('Cached url not found')

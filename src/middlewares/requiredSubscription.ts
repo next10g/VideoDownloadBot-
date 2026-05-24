@@ -1,6 +1,7 @@
 import { NextFunction } from 'grammy'
 import { GrammyError } from 'grammy'
 import env from '@/helpers/env'
+import { isBotAdminId } from '@/helpers/isBotAdmin'
 import { buildSubscriptionKeyboard } from '@/helpers/progressKeyboard'
 import Context from '@/models/Context'
 import logger from '@/lib/logger'
@@ -61,7 +62,7 @@ export default async function requiredSubscription(
   ) {
     return next()
   }
-  if (ctx.from.id === env.ADMIN_ID) {
+  if (isBotAdminId(ctx.from.id)) {
     return next()
   }
 

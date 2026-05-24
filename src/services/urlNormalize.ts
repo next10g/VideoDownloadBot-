@@ -8,6 +8,9 @@ const TRACKING_PARAMS = [
   'gclid',
   'si',
   'feature',
+  'igsh',
+  'igshid',
+  'ig_rid',
 ]
 
 /** Expand short hosts so yt-dlp gets a canonical URL. */
@@ -47,6 +50,12 @@ export function normalizeUrl(raw: string): string {
       url.hostname === 'web.facebook.com'
     ) {
       url.hostname = 'www.facebook.com'
+    }
+    if (
+      url.hostname === 'instagram.com' ||
+      url.hostname.endsWith('.instagram.com')
+    ) {
+      url.hostname = 'www.instagram.com'
     }
     expandShortHosts(url)
     for (const param of TRACKING_PARAMS) {

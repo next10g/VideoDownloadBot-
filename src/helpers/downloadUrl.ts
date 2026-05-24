@@ -184,6 +184,7 @@ export default async function downloadUrl(
       maxHeight,
       imageMode,
       sourceUrl: downloadJob.url,
+      preferredAudioExt: downloadJob.preferredExt || undefined,
     }
 
     logger.info('download start', {
@@ -338,6 +339,7 @@ export default async function downloadUrl(
         audio: downloadJob.audio,
         downloadMode: downloadJob.downloadMode,
         maxHeight: downloadJob.maxHeight,
+        preferredExt: downloadJob.preferredExt,
       },
       fileId,
       escapedTitle || 'No title'
