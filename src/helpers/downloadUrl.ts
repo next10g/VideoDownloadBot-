@@ -51,6 +51,7 @@ import { downloadImagesToDir } from '@/helpers/downloadSocialImages'
 import { fetchImageToFile } from '@/helpers/fetchImageToFile'
 import {
   downloadInstagramCdnImage,
+  downloadInstagramPostImages,
   shouldUseInstagramDownloaders,
 } from '@/helpers/instagramImageDownload'
 import { sendPhotoAlbum } from '@/helpers/sendPhotoAlbum'
@@ -319,30 +320,56 @@ export default async function downloadUrl(
     }
 
     if (!filePath && !photoPaths?.length && isSocial && wantImages) {
-      const imageUrls =
-        downloadJob.albumUrls?.filter(Boolean).length
-          ? downloadJob.albumUrls!
-          : await probeSocialImageUrls(downloadJob.url)
-      if (imageUrls.length > 1) {
-        photoPaths = await downloadImagesToDir(
-          imageUrls,
-          jobDir,
-          downloadJob.url
-        )
-        info = { title: 'Album' } as YtDlpMetadata
-      } else if (imageUrls.length === 1) {
-        const dest = join(jobDir, 'video.jpg')
-        const downloaded = shouldUseInstagramDownloaders(downloadJob.url)
-          ? await downloadInstagramCdnImage(
-              imageUrls[0],
-              downloadJob.url,
-              dest,
-              jobDir,
-              'video'
-            )
-          : await fetchImageToFile(imageUrls[0], dest)
-        filePath = await prepareTelegramPhoto(downloaded, jobDir)
-        info = { title: 'Photo', ext: 'jpg' } as YtDlpMetadata
+      if (shouldUseInstagramDownloaders(downloadJob.url)) {
+        try {
+          const rawPaths = await downloadInstagramPostImages(
+            downloadJob.url,
+            jobDir
+          )
+          const prepared = await Promise.all(
+            rawPaths.map((p) => prepareTelegramPhoto(p, jobDir))
+          )
+          if (prepared.length > 1) {
+            photoPaths = prepared
+            info = { title: 'Album' } as YtDlpMetadata
+          } else if (prepared.length === 1) {
+            filePath = prepared[0]
+            info = { title: 'Photo', ext: 'jpg' } as YtDlpMetadata
+          }
+        } catch (error) {
+          logger.warn('instagram post download failed, scrape fallback', {
+            url: downloadJob.url,
+            detail: error instanceof Error ? error.message : String(error),
+          })
+        }
+      }
+
+      if (!filePath && !photoPaths?.length) {
+        const imageUrls =
+          downloadJob.albumUrls?.filter(Boolean).length
+            ? downloadJob.albumUrls!
+            : await probeSocialImageUrls(downloadJob.url)
+        if (imageUrls.length > 1) {
+          photoPaths = await downloadImagesToDir(
+            imageUrls,
+            jobDir,
+            downloadJob.url
+          )
+          info = { title: 'Album' } as YtDlpMetadata
+        } else if (imageUrls.length === 1) {
+          const dest = join(jobDir, 'video.jpg')
+          const downloaded = shouldUseInstagramDownloaders(downloadJob.url)
+            ? await downloadInstagramCdnImage(
+                imageUrls[0],
+                downloadJob.url,
+                dest,
+                jobDir,
+                'video'
+              )
+            : await fetchImageToFile(imageUrls[0], dest)
+          filePath = await prepareTelegramPhoto(downloaded, jobDir)
+          info = { title: 'Photo', ext: 'jpg' } as YtDlpMetadata
+        }
       }
     }
 

@@ -1,4 +1,5 @@
 import { isInstagramUrl } from '@/helpers/instagramUrl'
+import { normalizeMediaUrl } from '@/helpers/normalizeMediaUrl'
 
 /** Score URL by embedded /sWxH/ size (higher = larger). */
 function resolutionScore(url: string): number {
@@ -42,7 +43,7 @@ function filterPass(
   const byKey = new Map<string, { url: string; score: number }>()
 
   for (const raw of urls) {
-    const url = raw.trim()
+    const url = normalizeMediaUrl(raw)
     if (!url.startsWith('http')) {
       continue
     }

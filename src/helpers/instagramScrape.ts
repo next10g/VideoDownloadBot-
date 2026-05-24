@@ -1,4 +1,5 @@
 import { filterSocialImageUrls } from '@/helpers/filterSocialImageUrls'
+import { normalizeMediaUrl } from '@/helpers/normalizeMediaUrl'
 import { isInstagramReelUrl } from '@/helpers/instagramUrl'
 import env from '@/helpers/env'
 import logger from '@/lib/logger'
@@ -13,7 +14,7 @@ const IG_DESKTOP_UA =
 const SCRAPE_SANITY_MAX = 15
 
 function decodeJsonUrl(raw: string): string {
-  return raw.replace(/\\u0026/g, '&').replace(/\\\//g, '/')
+  return normalizeMediaUrl(raw.replace(/\\\//g, '/'))
 }
 
 function collectDisplayUrls(html: string, start: number, maxLen: number): string[] {
@@ -24,7 +25,7 @@ function collectDisplayUrls(html: string, start: number, maxLen: number): string
   while ((match = re.exec(slice))) {
     const raw = decodeJsonUrl(match[1])
     if (raw.startsWith('http')) {
-      urls.push(raw.split('&amp;').join('&'))
+      urls.push(normalizeMediaUrl(raw))
     }
   }
   return urls
